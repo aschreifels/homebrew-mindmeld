@@ -30,22 +30,22 @@ class Mindmeld < Formula
   on_macos do
     on_arm do
       url "https://github.com/aschreifels/homebrew-mindmeld/releases/download/v0.0.1-test/mindmeld_v0.0.1-test_darwin_arm64.tar.gz"
-      sha256 "332abd6574de42df260dab804c72738633a04d8ccae369a78956f9ea348927b6"
+      sha256 "a48d62c6e47b6d9e817567fabba43ce38e89bc79b7f43f9752090ee581b6c10c"
     end
     on_intel do
       url "https://github.com/aschreifels/homebrew-mindmeld/releases/download/v0.0.1-test/mindmeld_v0.0.1-test_darwin_amd64.tar.gz"
-      sha256 "716e787f8b96dbbe2e2fbd7f6c324fab9c8f88b2b512efba3be657db8cccb013"
+      sha256 "4ec3c4f7bfac36bf3e51e0b2e71c16866c5eb265ec03bc8998e2605c1fb68723"
     end
   end
 
   on_linux do
     on_arm do
       url "https://github.com/aschreifels/homebrew-mindmeld/releases/download/v0.0.1-test/mindmeld_v0.0.1-test_linux_arm64.tar.gz"
-      sha256 "50dc7ee398ca302a853e86a90a184e4a01568d4d2267f34a5370826c8ea8fa39"
+      sha256 "5bb13566269d859ba57785eb80a5e291eb171c466e900aab5aea6015a102c104"
     end
     on_intel do
       url "https://github.com/aschreifels/homebrew-mindmeld/releases/download/v0.0.1-test/mindmeld_v0.0.1-test_linux_amd64.tar.gz"
-      sha256 "0265e1b60796814dc5f7f5b832dfba8a6dec04d8204ac2daca902a669935a53c"
+      sha256 "fad931c514bf0901e74089872c987f4dd8bc4cb16d3fc93b7b14529a6ad06e9b"
     end
   end
 
