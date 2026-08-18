@@ -1,12 +1,12 @@
 class Mindmeld < Formula
   desc     "Continuity engine for an agent-fed knowledge base"
   homepage "https://github.com/aschreifels/homebrew-mindmeld"
-  # 0.2.0, not v0.2.0: Homebrew's version field is the package's
+  # 0.3.0, not v0.3.0: Homebrew's version field is the package's
   # own identity and feeds upgrade comparison, and `brew style` rejects a
   # leading "v" there (FormulaAudit/Version). The git tag and the release
   # asset filenames are a separate namespace and keep the "v" they were built
   # with — hence two tokens rather than one.
-  version  "0.2.0"
+  version  "0.3.0"
   license  "Apache-2.0"
 
   # git:     `init` clones/pulls the knowledge base with it.
@@ -29,23 +29,23 @@ class Mindmeld < Formula
   # these four blocks per install, based on the running machine.
   on_macos do
     on_arm do
-      url "https://github.com/aschreifels/homebrew-mindmeld/releases/download/v0.2.0/mindmeld_v0.2.0_darwin_arm64.tar.gz"
-      sha256 "414ab5c8ca0e1d14aef4d5ac5d86b68a6ef50e5513d45ab3705153bed7626e25"
+      url "https://github.com/aschreifels/homebrew-mindmeld/releases/download/v0.3.0/mindmeld_v0.3.0_darwin_arm64.tar.gz"
+      sha256 "f9880662d509f375e0d238aec7a2ea81e7c0c1cc56f9630972e496f17e92867d"
     end
     on_intel do
-      url "https://github.com/aschreifels/homebrew-mindmeld/releases/download/v0.2.0/mindmeld_v0.2.0_darwin_amd64.tar.gz"
-      sha256 "9a6e60f11cbf4431bf59dccd1b38640a19ea1957efcc0f20d11b43939de25724"
+      url "https://github.com/aschreifels/homebrew-mindmeld/releases/download/v0.3.0/mindmeld_v0.3.0_darwin_amd64.tar.gz"
+      sha256 "edb8c1ee2bf138894a4f3d9051654964668ee2a0f13c31c85a59248b16e39e5e"
     end
   end
 
   on_linux do
     on_arm do
-      url "https://github.com/aschreifels/homebrew-mindmeld/releases/download/v0.2.0/mindmeld_v0.2.0_linux_arm64.tar.gz"
-      sha256 "bffe3657ad43360cfb4c4e4b843c089387394f439d1bbe44199fe67aea46a109"
+      url "https://github.com/aschreifels/homebrew-mindmeld/releases/download/v0.3.0/mindmeld_v0.3.0_linux_arm64.tar.gz"
+      sha256 "89760df06d963f25a6824e3e41b822c1071a25e498c16ec18b35ebc8cfc3a902"
     end
     on_intel do
-      url "https://github.com/aschreifels/homebrew-mindmeld/releases/download/v0.2.0/mindmeld_v0.2.0_linux_amd64.tar.gz"
-      sha256 "137f815333d0ba19afaf336b4dc845bb818a29112769c9d0ccdbdcad793439c3"
+      url "https://github.com/aschreifels/homebrew-mindmeld/releases/download/v0.3.0/mindmeld_v0.3.0_linux_amd64.tar.gz"
+      sha256 "154ef1608ea86f313b4de9e6e7681f800e53bf5d3d4c39b40ce66ec218f4e956"
     end
   end
 
@@ -58,9 +58,11 @@ class Mindmeld < Formula
     # the five paths the resolver requires as a set — ship four of them and
     # every command that resolves the ring fails its own marker check on a
     # brand-new install. hooks/ isn't itself a marker, but ships because
-    # `init` symlinks the pulse hook out of it.
+    # `init` symlinks the pulse hook out of it. docs/ isn't a marker either,
+    # but ships because `mindmeld docs`/`docs install` read it straight off
+    # the ring, same as hooks/.
     libexec.install "skills", "templates", "bases", "kb-scaffold",
-                     "hooks", "mindmeld.toml.example"
+                     "hooks", "docs", "mindmeld.toml.example"
   end
 
   test do
