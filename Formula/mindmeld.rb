@@ -1,12 +1,12 @@
 class Mindmeld < Formula
   desc     "Continuity engine for an agent-fed knowledge base"
   homepage "https://github.com/aschreifels/homebrew-mindmeld"
-  # 0.3.0, not v0.3.0: Homebrew's version field is the package's
+  # 0.3.1, not v0.3.1: Homebrew's version field is the package's
   # own identity and feeds upgrade comparison, and `brew style` rejects a
   # leading "v" there (FormulaAudit/Version). The git tag and the release
   # asset filenames are a separate namespace and keep the "v" they were built
   # with — hence two tokens rather than one.
-  version  "0.3.0"
+  version  "0.3.1"
   license  "Apache-2.0"
 
   # git:     `init` clones/pulls the knowledge base with it.
@@ -29,23 +29,23 @@ class Mindmeld < Formula
   # these four blocks per install, based on the running machine.
   on_macos do
     on_arm do
-      url "https://github.com/aschreifels/homebrew-mindmeld/releases/download/v0.3.0/mindmeld_v0.3.0_darwin_arm64.tar.gz"
-      sha256 "f9880662d509f375e0d238aec7a2ea81e7c0c1cc56f9630972e496f17e92867d"
+      url "https://github.com/aschreifels/homebrew-mindmeld/releases/download/v0.3.1/mindmeld_v0.3.1_darwin_arm64.tar.gz"
+      sha256 "152eb6be23dc4085e5d430a51c22680a57825f633716fe75f143c355e3c11af3"
     end
     on_intel do
-      url "https://github.com/aschreifels/homebrew-mindmeld/releases/download/v0.3.0/mindmeld_v0.3.0_darwin_amd64.tar.gz"
-      sha256 "edb8c1ee2bf138894a4f3d9051654964668ee2a0f13c31c85a59248b16e39e5e"
+      url "https://github.com/aschreifels/homebrew-mindmeld/releases/download/v0.3.1/mindmeld_v0.3.1_darwin_amd64.tar.gz"
+      sha256 "bc16f869d7599a46b040664d811ff3cb6d8fe26607b26b910ecddbaf8e08d93f"
     end
   end
 
   on_linux do
     on_arm do
-      url "https://github.com/aschreifels/homebrew-mindmeld/releases/download/v0.3.0/mindmeld_v0.3.0_linux_arm64.tar.gz"
-      sha256 "89760df06d963f25a6824e3e41b822c1071a25e498c16ec18b35ebc8cfc3a902"
+      url "https://github.com/aschreifels/homebrew-mindmeld/releases/download/v0.3.1/mindmeld_v0.3.1_linux_arm64.tar.gz"
+      sha256 "0a4ae46110baa91cd67d848641f7eda64247838c8dc5e8d6da91308c3676505f"
     end
     on_intel do
-      url "https://github.com/aschreifels/homebrew-mindmeld/releases/download/v0.3.0/mindmeld_v0.3.0_linux_amd64.tar.gz"
-      sha256 "154ef1608ea86f313b4de9e6e7681f800e53bf5d3d4c39b40ce66ec218f4e956"
+      url "https://github.com/aschreifels/homebrew-mindmeld/releases/download/v0.3.1/mindmeld_v0.3.1_linux_amd64.tar.gz"
+      sha256 "43b469397be6b1027a99c214f8a742e4d0c2baa1fc79a565ba0f90215150e20f"
     end
   end
 
