@@ -159,8 +159,9 @@ work actually starts.
 
 ### Domain values
 
-Configured under `domains:` in the KB's config (e.g. `scribe.yaml`, when that tooling
-is present). A typical KB uses:
+A closed enum, validated by `mindmeld lint` against the `domain` list in the lint
+schema's `[enums]` table (a KB that forks the schema at `.mindmeld/schema.toml` carries
+its own list). The shipped values:
 
 - `contract`
 - `general`
@@ -168,25 +169,34 @@ is present). A typical KB uses:
 - `personal`
 - `work`
 
-The `personal` and `general` domains are always accepted for cross-cutting content.
+The `personal` and `general` domains are always accepted for cross-cutting content. A
+value outside the list fails lint rather than slipping in as a new domain.
 
 ---
 
 ## Operations
 
-If a KB-maintenance tool (e.g. `scribe`) is present on the machine, it typically exposes
-operations along these lines — detected-if-present, never assumed:
+Run via the `mindmeld` CLI. **Nothing runs on cron — you run these, as the last step of
+the work:**
 
-- sync — discover projects, extract changed repos, absorb raw articles, reindex qmd.
-- sync --sessions — mine Claude Code sessions via a session-mining connector.
-- capture — capture and fetch queued external content.
-- dream — periodic memory consolidation.
-- lint --changed — validate frontmatter on uncommitted changes.
-- triage — score sessions by knowledge density.
-- doctor — health check over deps, config, cron, state, freshness, errors.
+- `mindmeld sync` — pull, reconcile, push against the KB's remote. **It never commits
+  for you**: it refuses when a dirty path would collide with what the incoming merge
+  brings in (dirty-but-disjoint proceeds, with a note). Commit your own work first, and
+  leave anything that isn't yours alone. That refusal is the difference between a tool
+  that lands your changes and one that silently adopts someone else's.
+- `mindmeld reindex` — the one locked qmd reindex. A file on disk that isn't reindexed
+  won't surface in `qmd query`, so KB writes aren't done until this has run.
+- `mindmeld lint` — the landing pass: frontmatter schema, index reconcile, duplicates.
+- `mindmeld mine status|run|review|promote|reject` — turn past sessions and changesets
+  into candidate drafts, then judge them. `mindmeld mine archive` sweeps live sessions
+  into the machine-local spool; the SessionStart hook fires it silently.
+- `mindmeld hot` — regenerate the session-start pulse cache (`wiki/_hot.md`).
+- `mindmeld doctor` — read-only health check over config, deps, the installed rituals,
+  the qmd collections, and the session archive. Repair means `mindmeld update`;
+  `mindmeld init` only before the first install.
 
-None of this is required for the KB to function — the schema and directory layout above
-are the contract; automation on top of them is optional.
+See `mindmeld --help` for the full command tree, and `docs/mindmeld/` for the stamped
+guide.
 
 ---
 

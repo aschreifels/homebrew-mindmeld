@@ -18,17 +18,50 @@ prints the same lines as plain text, one per check.
 ## What it does
 
 Walks a fixed sequence of checks, each reported as `✓`/`−`/`✗ [doctor] message`: config
-parses, the KB root exists, required deps are present (`git`, `rg`, `yq`, `qmd`), which
-`[install]` adapter is active and the instruction-file layout at the KB root, every
+parses, any `mindmeld.toml` key a release has moved or removed is called out, the KB
+root exists, required deps are present (`git`, `rg`, `yq`, `qmd`), which `[install]` adapter is active and the instruction-file layout at the KB root, every
 adapter skill's and the pulse hook's ownership, the instance ring's presence, the
 `settings.json` SessionStart hook is wired, the qmd collections are registered, the
 guide copy in your KB is current, the active adapter's machine-readable capability
 manifest is current and what it says about this host before a session starts, the
 session archive is swept, how each portable executor class in `[execution.classes]`
-resolves, build identity, checkout freshness, Obsidian/`scribe` presence
-(informational), and the served MCP surface plus whether the configured adapter's
-harness is actually registered against it. Nine of these deserve their own
-explanation.
+resolves, build identity, checkout freshness, Obsidian presence (informational), and
+the served MCP surface plus whether the configured adapter's harness is actually
+registered against it. Several of these deserve their own explanation.
+
+### Which command a repair names
+
+A repair is the command that clears the line, and which command that is depends on
+whether this machine already has an instance. `doctor` counts an instance as initialized
+when the config loads and the KB root validates — not when a `mindmeld.toml` file exists,
+since a legacy `spawn.toml` or a `MINDMELD_KB` override is an initialized instance too.
+
+| Instance | Repair for anything `update` performs |
+|---|---|
+| initialized | `run 'mindmeld update'` |
+| not yet | `run 'mindmeld init'` |
+
+"Anything `update` performs" is most of the walk: the instruction-file shim, the skills
+and the pulse hook, the `settings.json` hook, the qmd collections, the guide, the adapter
+notes and manifest, the seed-tracked templates, and the MCP registration. Every line in
+one walk quotes the same command, so the summary at the end collapses them to one repair.
+What stays outside that rule is spelled out where it applies below: a skill or hook
+installed as a real path, a hook the config says not to wire, an unsupported adapter, a
+pre-split `CLAUDE.md`, and a missing config or KB root, which only `init` can create.
+
+### Config
+
+`✓ [doctor] config parses (<path>)` is the usual line. A machine that runs with no
+`mindmeld.toml` at all but names its KB through `MINDMELD_KB` is a valid, initialized
+instance — `update` works there, and `init` would only write a file — so it reads as
+information rather than an error:
+
+```text
+✓ [doctor] no mindmeld.toml — running on MINDMELD_KB (<root>)
+```
+
+With neither a file nor `MINDMELD_KB`, or a file that doesn't parse, the line is the error
+`config missing or does not parse (<path>)`, repaired by `mindmeld init`.
 
 ### Adapter and instruction-file layout
 
@@ -49,12 +82,18 @@ but hand-authored, or absent entirely. Five states, one line each:
 | Line | Meaning | Repair |
 |---|---|---|
 | `✓ [doctor] AGENTS.md present, CLAUDE.md shim materialized` | the healthy state — the shim's body is exactly `@AGENTS.md` | — |
-| `− [doctor] AGENTS.md present, CLAUDE.md shim missing` | the neutral file exists but the adapter hasn't generated the shim on this machine yet | `mindmeld init` |
+| `− [doctor] AGENTS.md present, CLAUDE.md shim missing — run 'mindmeld update'` | the neutral file exists but the adapter hasn't generated the shim on this machine yet | `mindmeld update` |
 | `− [doctor] CLAUDE.md is not the generated shim — left alone` | `CLAUDE.md` exists with a body that isn't the generated shim — either you replaced it on purpose, or it couldn't be read; either way there's nothing to repair | none |
-| `− [doctor] legacy CLAUDE.md at the KB root, no AGENTS.md` | a KB scaffolded before the neutral file existed — it still works under this harness, it's just lost portability | rename, then `mindmeld init` — see [Troubleshooting](../troubleshooting.md) |
-| `✗ [doctor] no instruction file at the KB root` | neither file exists | `mindmeld init` |
+| `− [doctor] legacy CLAUDE.md at the KB root, no AGENTS.md — follow 'Migrating a pre-split KB' in <kb>/docs/mindmeld/troubleshooting.md` | a KB scaffolded before the neutral file existed — it still works under this harness, it's just lost portability | the written migration, a few manual edits — see [Troubleshooting](../troubleshooting.md#migrating-a-pre-split-kb) |
+| `✗ [doctor] no instruction file at the KB root — run 'mindmeld update'` | neither file exists | `mindmeld update` |
 
-Full symptom/cause/fix writeup, including the manual rename: [Troubleshooting](../troubleshooting.md).
+The legacy line names the stamped copy of the troubleshooting page by absolute path when
+it's on disk; a KB that predates the guide stamp gets `in the troubleshooting guide`
+instead, since a path the reader can't open helps nobody. An unsupported adapter ends in
+`set [install].adapter in mindmeld.toml to a supported adapter` rather than a command —
+reinstalling can't fix a name that resolves to nothing.
+
+Full symptom/cause/fix writeup, including the migration: [Troubleshooting](../troubleshooting.md).
 
 ### Skill and hook ownership
 
@@ -64,17 +103,48 @@ Each adapter skill (`spawn-session`, `wrap-session`, `kb-ticket`, `voice-distill
 | State | Meaning | Severity |
 |---|---|---|
 | linked to checkout | a symlink resolving to `<repo>/skills/<name>` | OK |
-| linked elsewhere | a symlink, but to a different target — another sync system got there first | warn, repair: `mindmeld init` |
-| installed as a real path | a real file or directory, not a symlink — `--copy`'s normal shape, a supported posture | warn, repair: `mindmeld init` |
-| missing or dangling | nothing there, or a symlink whose target is gone | error, repair: `mindmeld init` |
+| linked elsewhere | a symlink, but to a different target — another sync system got there first | warn, repair: `mindmeld update` |
+| installed as a real path | a real file or directory, not a symlink — `--copy`'s normal shape, a supported posture | warn, repair: `mindmeld update` (or `mindmeld update --copy` for a copy install) |
+| missing or dangling | nothing there, or a symlink whose target is gone | error, repair: `mindmeld update` |
+
+The real-path repair carries the `--copy` alternative because a plain `update` re-links a
+copy install into a symlink one — the repair for a foreign writer, not for a posture you
+chose. The line reads `… installed as a real path, not linked to the checkout — run
+'mindmeld update' (or 'mindmeld update --copy' for a copy install)`. Before the first
+install every one of these says `mindmeld init` instead.
+
+### Settings hook
+
+Whether the `SessionStart` hook entry is in `~/.claude/settings.json` follows
+`[install].hooks`, because the config decides whether mindmeld was ever going to write it:
+
+| `[install].hooks` | Line | Severity | Repair |
+|---|---|---|---|
+| `auto` (or unset) | `✗ [doctor] settings.json SessionStart hook not wired — run 'mindmeld update'` | error | `mindmeld update` |
+| `print` | `− [doctor] settings.json SessionStart hook not wired — wire the SessionStart hook by hand — 'mindmeld update' prints the snippet in print mode` | warn | paste the snippet |
+| `off` | `− [doctor] settings.json SessionStart hook not wired` | warn | none — the configured state |
+
+The same split as the MCP registration below: an opt-out you configured must not turn the
+machine red.
+
+Under `print` the snippet comes from `update` once the instance is initialized, and from
+`init` before the first install, so the line reads `… 'mindmeld init' prints the snippet in
+print mode` on a machine with no instance yet.
 
 ### Owner identity
 
 `[kb] owner` gets a matching classification, not a bare stat of `people/{owner}/`: an
 ambiguous KB (more than one identity home) warns and names all of them; an unset owner
-sitting next to exactly one identity home warns and points at `mindmeld init` to adopt
-it; a configured owner that disagrees with the KB's real identity home warns and names
-the fix (hand-edit `mindmeld.toml`); a missing identity home warns, informational only.
+sitting next to exactly one identity home warns and carries the edit that adopts it; a
+configured owner that disagrees with the KB's real identity home warns and carries the
+edit that points it at the right one; a missing identity home warns, informational only.
+The two repairs are hand edits, because `mindmeld.toml` is yours and `init` won't reassign
+an owner once stamped:
+
+```text
+− [doctor] owner unset — this KB's identity home is "<home>" — set [kb] owner = "<home>" in mindmeld.toml
+− [doctor] configured owner "<slug>" is not this KB's identity home "<home>" — voice captures fork here — set [kb] owner = "<home>" in mindmeld.toml
+```
 
 ### qmd collections
 
@@ -82,19 +152,36 @@ The KB-root collection is required — missing it is an error. Two more collecti
 classified only once the KB-root one resolves: `candidates` and `patterns`, the mining
 lane's scoped-recall targets. Each is one of registered-and-excluded (OK),
 registered-but-not-excluded-from-default-queries (warn — every promoted article comes
-back twice), or not-registered (error). Both point at `mindmeld init`, not `update` —
-`update` deliberately never re-runs the index step, so re-running `init` is the repair.
+back twice), or not-registered (error). Every one of these takes `mindmeld update` as its
+repair: `update` registers the missing collections and excludes the scoped pair, and it
+never embeds. A collection it just registered is reported as `qmd collection <name>
+registered — run 'mindmeld reindex' to embed it`, because an empty collection answers
+nothing until `reindex` fills it. Before the first install the repair is `mindmeld init`.
 
 ### Session archive
 
 Reads the sweep stamp against the live session store's newest activity, never the
-archive's own contents (reclamation can legitimately drain it to empty). Four states: no
+archive's own contents (reclamation can legitimately drain it to empty). Four states
+(the third and fourth split on the grace described below): no
 live sessions and no stamp (OK, nothing to archive); live sessions and no stamp (error —
 this machine has never swept, real data loss in progress); stamp at or after the newest
 live session (OK, swept, with totals); stamp behind the newest live session (warn, N
 sessions newer). A spool configured outside `$HOME` is a separate error — the mining
 ledger can't record a path it can't express `~`-relative. Any unreadable spooled entry
 adds its own warn line.
+
+A session newer than the stamp counts as missed only once it has been quiet for
+`[mining].min_idle` (default `30m`). One still inside that window is presumed live — the
+miner reads it the same way — and the next sweep takes it, so `mindmeld mine archive`
+couldn't clear it anyway. Those ride the OK line as a suffix instead of a warning:
+
+```text
+✓ [doctor] session archive swept 2h ago (4 archived, 1 reclaimed) — 1 active session(s) since, taken by the next sweep
+− [doctor] session archive last swept 2h ago, 3 sessions newer — run 'mindmeld mine archive'
+```
+
+The warn counts missed sessions only. `min_idle = "0"` turns the grace off: every newer
+session is missed, as before the grace existed. See [config.md#mining](../config.md#mining).
 
 ### Guide freshness
 
@@ -106,17 +193,43 @@ the KB root resolves. Lines it can print:
 | Line | Meaning | Repair |
 |---|---|---|
 | `✓ [doctor] docs current in <kb>/docs/mindmeld (N pages, <version>)` | every page carries the marker and matches this build byte-for-byte | — |
-| `− [doctor] docs missing from <kb>/docs/mindmeld (N of M) — run mindmeld docs install` | pages were never stamped (a KB that predates the guide) | `mindmeld docs install` |
-| `− [doctor] docs stale in <kb>/docs/mindmeld (N page(s) stamped <old>, running <new>) — run mindmeld update` | the stamped marker names an older version than the binary you're running | `mindmeld update` |
+| `− [doctor] docs missing from <kb>/docs/mindmeld (N of M) — run 'mindmeld update'` | pages were never stamped (a KB that predates the guide) | `mindmeld update` |
+| `− [doctor] docs stale in <kb>/docs/mindmeld (N page(s) stamped <old>, running <new>) — run 'mindmeld update'` | the stamped marker names an older version than the binary you're running | `mindmeld update` |
 | `− [doctor] docs locally modified: N page(s) in <kb>/docs/mindmeld are not mindmeld-managed — delete them to receive the shipped pages` | a page lost its `mindmeld_managed` marker — it's yours now, and the engine won't overwrite it | delete the file |
-| `− [doctor] docs orphaned: N page(s) in <kb>/docs/mindmeld are no longer shipped — run mindmeld update` | a marked page whose topic no longer exists upstream; `update` prunes it | `mindmeld update` |
+| `− [doctor] docs orphaned: N page(s) in <kb>/docs/mindmeld are no longer shipped — run 'mindmeld update'` | a marked page whose topic no longer exists upstream; `update` prunes it | `mindmeld update` |
 | `− [doctor] <kb>/.mindmeld/schema.toml does not exclude "docs" from [scope].exclude_dirs — mindmeld lint will gate the guide pages; add "docs" to that list` | your KB forked its lint schema before the shipped one excluded `docs` | one-line edit to your fork |
 | `− [doctor] <kb>/docs/mindmeld is not gitignored — mindmeld sync refuses a dirty tree; add "docs/mindmeld/" to <kb>/.gitignore` | your KB's `.gitignore` predates the guide being made machine-local — the stamped copy lands untracked, and `mindmeld sync` refuses any dirty tree | add `docs/mindmeld/` to `<kb>/.gitignore` |
 | `− [doctor] docs not shipped with this install (ring: <root>) — upgrade mindmeld` | a checkout or package that predates the guide — informational, never a failure | upgrade |
 
+Before the first install the three `run 'mindmeld update'` repairs say `run 'mindmeld init'`.
 Several can print in the same run (stale pages plus one orphan, say); missing is
 reported on its own only when nothing is stale or modified. See
 [mindmeld docs](docs.md) for the install step these lines describe.
+
+### Config drift
+
+Right after the config line, `doctor` reads `mindmeld.toml` against a small table of keys
+releases have moved, removed or introduced. It never edits the file. A clean config
+prints nothing, and so does one that is absent, unreadable or doesn't parse —
+`config parses` already owns reporting those.
+
+| Line | Meaning | Repair |
+|---|---|---|
+| `− [doctor] [mining.recurrence] reindex_timeout has moved to [reindex] timeout — the value here is ignored — edit mindmeld.toml by hand, or run 'mindmeld update --config'` | the file still sets a key at its old path; the release reads the new one, so the old value does nothing | edit the file, or `mindmeld update --config` |
+| `− [doctor] [mining.recurrence] reindex_timeout has moved to [reindex] timeout — the value here is ignored ([reindex] timeout already set — old key is ignored) — edit mindmeld.toml by hand, or run 'mindmeld update --config'` | the same, with the new key already set too — the old line is dead weight | the same |
+| `− [doctor] <key> is no longer read — remove it — edit mindmeld.toml by hand, or run 'mindmeld update --config'` | the file sets a key no release reads any more | the same |
+| `− [doctor] [mining.recurrence] reindex_timeout has moved to [reindex] timeout — the value here is ignored — edit mindmeld.toml by hand` | the same move, written in a shape `update --config` declines to rewrite (anything but a single-line `key = value` under its own `[table]` header) | edit the file — the `--config` clause is dropped rather than promise a rewrite that would refuse |
+| `✓ [doctor] config: 4 newer key(s) unset, defaults in force — [reindex] timeout (10m), [install] mcp (auto), [execution] record_executor (true), [defaults] dossier_archive_dir (<dossier_dir>-archive)` | informational, never a warning: keys added since v0.4.0 that the file doesn't set, each with the default in force | none — set one only to change it |
+
+The repair names the file actually loaded, so a legacy `spawn.toml` reads `edit spawn.toml
+by hand`. A `MINDMELD_KB` instance with no config file has nothing to read, so this check
+prints nothing there.
+
+The unset line lists only the keys the file really leaves out, so it shrinks as you set
+them and disappears once none are left. `mindmeld update` reports the same moved and
+removed keys, `mindmeld mine` and `mindmeld reindex` print the moved-key sentence when
+they hit one, and `update --config` is the opt-in rewrite — see
+[mindmeld update](update.md#config-drift).
 
 ### Dossier archive root
 
@@ -140,7 +253,8 @@ The active adapter ships a machine-readable capability manifest beside its notes
 `adapters/<adapter>/manifest.json`, stamped into `{kb.root}/adapters/<adapter>/` the
 same marker-guarded way notes.md is (current, stale, missing, or locally modified —
 the same four states [Adapter and instruction-file layout](#adapter-and-instruction-file-layout)
-describes for notes.md, reported here for the manifest instead). Once that file
+describes for notes.md, reported here for the manifest instead; a missing or stale one
+takes the reinstall repair, `run 'mindmeld update'`). Once that file
 classifies as readable, `doctor` goes further than presence: it parses the manifest and
 diagnoses what it says about this host, before a session ever declares a chunk graph.
 
@@ -182,8 +296,10 @@ An absent or invalid manifest degrades rather than crashing: a manifest that isn
 shipped or installed yet reports nothing beyond the freshness line above (there is
 nothing to diagnose); one that reads but fails to parse or validate as a capability
 manifest — a stale stamp from a schema that has since changed, most likely — gets one
-line naming the parse failure, and every diagnostic above it is skipped rather than
-reasoning over a manifest known to be wrong.
+line naming the parse failure (the parse is strict, and it's the same one
+`chunk.declare` uses, so a stamp `doctor` flags is exactly one a declare would refuse),
+and every diagnostic above it is skipped rather than reasoning over a manifest known to
+be wrong.
 
 ### Executor class mapping
 
@@ -197,13 +313,29 @@ time.
 | State | Meaning | Severity |
 |---|---|---|
 | mapped | a distinct entry in `[execution.classes]` for this class | OK |
-| collapsed | mapped, but sharing its executor with another class — named in the line, alongside every class it shares with. A cost decision, not a fault. | warn, repair: edit `[execution.classes]` |
-| unmapped | no entry for this class — still runs delegated at that class on the host's default executor, recording a blank executor id | warn, no repair |
+| collapsed | mapped, but sharing its executor with another class — named in the line, alongside every class it shares with. A cost decision, not a fault. | warn, repair: `edit [execution.classes] in mindmeld.toml` |
+| unmapped | no entry for this class — still runs delegated at that class on the host's default executor, recording a blank executor id | warn, repair: the entries to add |
 
 A machine with no `[execution.classes]` table at all — the default, fresh off `mindmeld
 init` — reads as every class unmapped, never as an error. Read-only, like every check
-here: there is nothing this check writes, and the fix for a collapsed line is always a
-hand-edit to `mindmeld.toml`, never something `doctor` performs itself.
+here: there is nothing this check writes, and the fix for either state is a hand-edit to
+`mindmeld.toml`, never something `doctor` performs itself.
+
+The unmapped repair is authored by the active adapter, because executor strings are
+opaque to the engine and `doctor` never names a model itself. For `claude-code` a machine
+with nothing mapped gets, on each of the three lines:
+
+```text
+− [doctor] executor class mechanical unmapped — runs delegated on the host's default executor, recording a blank executor — add to [execution.classes] in mindmeld.toml: mechanical = "haiku", balanced = "sonnet", deep = "opus"
+```
+
+A suggestion is left out when its executor is already mapped to a different class, since
+adding it would collapse the two. The classes left without a usable suggestion are named
+at the end — `add to [execution.classes] in mindmeld.toml: deep = "opus"; see your
+adapter's notes.md for balanced` — and when none has one the repair is `map
+[execution.classes] in mindmeld.toml — see your adapter's notes.md`. All the unmapped
+lines of one walk share one repair, so the summary prints it once. The worked example
+lives in [config.md#execution](../config.md#execution).
 
 This check alone cannot tell you whether the active `[install]` adapter could actually
 *fill* a mapped class — that's a question about the adapter's own declared
@@ -242,8 +374,8 @@ derivations) and reads the harness's own registration surface (`~/.claude.json` 
 | State | Meaning | Severity under `auto` |
 |---|---|---|
 | current | the registered entry matches `want` exactly | OK |
-| stale | an entry exists under our name, but its command/args don't match — usually a moved checkout | warn, repair: `mindmeld update` |
-| missing | nothing registered under our name | **error**, repair: `mindmeld update` |
+| stale | an entry exists under our name, but its command/args don't match — usually a moved checkout | warn, repair: `mindmeld update` (by hand under `print`) |
+| missing | nothing registered under our name | **error**, repair: `mindmeld update` (`mindmeld init` before the first install; by hand under `print`) |
 | unreadable | the surface exists but can't be parsed as JSON, or its shape is wrong | **error**, repair: by hand — an unparseable harness config is never ours to overwrite |
 
 The severity column above is the `auto` column; `[install].mcp` moves it, and the whole
@@ -283,9 +415,12 @@ policy is the point, because "off and registered by hand" and "off and absent" a
 different situations and a line that only echoed the policy couldn't tell them apart.
 `[install].mcp = "print"` runs the same classification but degrades BOTH errors to warns:
 mindmeld never promised to write the registration under `print`, so neither its absence
-nor a surface it can't parse is a failed install, though `update` still has something
-useful to do about a missing one — print the registration hint again. The unreadable
-line keeps its by-hand repair under `print`; only its severity moves. And when the configured adapter is unsupported, this check
+nor a surface it can't parse is a failed install. For the same reason the repair on a
+stale or missing entry isn't `mindmeld update` — update never writes the entry under
+`print`, so re-running it can't clear the line — but the hand edit, with the command to
+copy coming from update's output:
+`register by hand — 'mindmeld update' prints the command in print mode`. The unreadable
+line keeps its own by-hand repair under `print`; only its severity moves. And when the configured adapter is unsupported, this check
 emits nothing at all; the adapter check above already reported that with its own error,
 and a second line repeating it would be noise, not a new fact.
 
@@ -310,16 +445,18 @@ nothing to summarize.
 
 ## Config it reads
 
-`[kb]` (root, owner), `[install]` (skills_dir, mcp, adapter), `[execution.classes]`,
-`[mining].archive_dir`, `[mining.recurrence]` (the scoped-collection names) — see
+`[kb]` (root, owner), `[install]` (skills_dir, hooks, mcp, adapter), `[execution.classes]`,
+`[mining].archive_dir`, `[mining].min_idle` (the archive check's active-session grace),
+`[mining.recurrence]` (the scoped-collection names) — see
 [config.md#kb](../config.md#kb), [config.md#install](../config.md#install),
 [config.md#execution](../config.md#execution),
 [config.md#mining](../config.md#mining). Full writeup:
 [doctor: ownership, not mere existence](../config.md#doctor-ownership-not-mere-existence).
 
 ## Related
-- [mindmeld init](init.md) — the repair for most `doctor` findings
-- [mindmeld update](update.md) — the repair for a stale checkout
+- [mindmeld update](update.md) — the repair for most `doctor` findings on an initialized
+  instance, and for a stale checkout
+- [mindmeld init](init.md) — the first install, and the repair before an instance exists
 - [Configuration](../config.md) — the full ownership-classification reference
 - [Adapters](../adapters.md) — what the active adapter owns
 - [Troubleshooting](../troubleshooting.md) — every line above, by symptom

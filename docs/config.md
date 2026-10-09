@@ -205,7 +205,7 @@ turns a session into candidate drafts.
 | key | type | required | default | who reads it |
 | --- | --- | --- | --- | --- |
 | `min_turns` | int | optional | `12` | `mine run`/`status`, to skip sessions shorter than this |
-| `min_idle` | duration string | optional | `"30m"` | `mine run`/`status`, how long a session's last message must have sat untouched before the session is eligible — parsed with `time.ParseDuration`, `"0"` disables the floor. Bypassed by `mine run --force` and by `mine run --session`, which is an explicit pin; `mine status` has no `--force` and always applies the floor, reporting each held-back session on its own line |
+| `min_idle` | duration string | optional | `"30m"` | `mine run`/`status`, how long a session's last message must have sat untouched before the session is eligible — parsed with `time.ParseDuration`, `"0"` disables the floor. Bypassed by `mine run --force` and by `mine run --session`, which is an explicit pin; `mine status` has no `--force` and always applies the floor, reporting each held-back session on its own line. `doctor`'s session-archive check reads it too — see below |
 | `min_anchors` | int | optional | `4` | the gate, the specificity bar a draft must clear before it lands |
 | `skip_projects` | array of strings | optional | `[]` | `mine run`/`status`, project basenames never mined — an empty list mines everything |
 | `extractor` | enum: `auto` \| `local` \| `agent` | optional | `"auto"` | `mine run`, which extractor turns a bundle into candidate drafts, unless `--extractor` overrides it for one call |
@@ -221,6 +221,12 @@ turns a session into candidate drafts.
 | `recurrence.patterns_collection` | string | optional | `""` | the qmd similarity adapter, the qmd collection to search for sightings of an already-PROMOTED pattern — `""` resolves to `{kb-basename}-patterns`. Without this second collection a promoted pattern is searchable but never searched: its recurrence count would restart at 1 the moment it left `candidates/`. `init` registers it alongside the candidates one, honoring an override the same way |
 | `recurrence.refresh` | bool | optional | `true` | the qmd similarity adapter, whether to reindex once per invocation before that invocation's first search (`mine run`, `mine land`, and `sweep land` alike) — note `qmd update` is global, so this touches every registered collection, not only the candidates one |
 | `recurrence.timeout` | duration string | optional | `"60s"` | the qmd similarity adapter, the ceiling for one `qmd query` — the wait for the shared lock included, capped at a quarter of the budget so a contended wait still leaves time to run the query, parsed with `time.ParseDuration` |
+
+`doctor`'s session-archive check uses the same `min_idle` as its grace: a session newer
+than the last sweep counts as missed only once it has been quiet this long. A newer
+session still inside the window is presumed live — the next sweep takes it — and shows on
+the OK line as `— N active session(s) since, taken by the next sweep` instead of as a
+warning. `"0"` turns the grace off there too, so every newer session is missed.
 
 `min_idle` exists because a session store has no "session closed" record. A
 session's `ended` is only the timestamp of its last message at read time, so
@@ -291,10 +297,10 @@ refusal at resolution time would brick the whole organ over a value nobody
 set.
 A second sighting of the same finding is recorded on the already-landed
 candidate instead of being refused — `mine review` sorts the queue by
-recurrence count, strongest corroboration first. `recurrence.enabled =
-false` restores pre-recurrence behavior exactly: no qmd subprocess runs, and
-the gate takes the candidates-tree duplicate-title check back over from the
-miner. The semantic tier degrades to a no-op when `qmd` isn't on `PATH` or
+recurrence count, strongest corroboration first.
+`recurrence.enabled = false` restores pre-recurrence behavior exactly: no qmd
+subprocess runs, and the gate takes the candidates-tree duplicate-title check
+back over from the miner. The semantic tier degrades to a no-op when `qmd` isn't on `PATH` or
 the candidates collection isn't registered — a run still lands candidates,
 it just stops noticing duplicates, never fails one. `recurrence.threshold`
 is a starting point, not a tuned constant: every `recurred` ledger row
@@ -365,6 +371,23 @@ lock note above; this section documents the verb's own knobs.
 | key | type | required | default | who reads it |
 | --- | --- | --- | --- | --- |
 | `timeout` | duration string | optional | `"10m"` | `mindmeld reindex`, the ceiling for the whole reindex — the wait for the index's own serialization and the work it protects (`qmd update` plus every `qmd embed`) share this one budget — an empty or unparseable value falls back to the default rather than refusing to run; `--no-wait` replaces waiting for the lock with a single non-blocking attempt instead |
+
+## Moved and removed keys
+
+A release now and then moves a key to a different table or stops reading it. A file
+that still sets the old spelling keeps parsing, but the value does nothing — so
+`mindmeld doctor` and `mindmeld update` both name each one and the exact edit. The only
+move so far is `[mining.recurrence] reindex_timeout`, which now lives at
+`[reindex] timeout`.
+
+`mindmeld update --config` makes the edit for you: it backs `mindmeld.toml` up beside
+itself as `mindmeld.toml.pre-mindmeld-<timestamp>`, rewrites only the moved or removed
+lines, and keeps your comments. It never adds a key you didn't set — a newer key's
+default stays in force, and `doctor` lists the ones your file leaves out as an
+informational line. A key written in a shape it can't safely rewrite, or a `mindmeld.toml`
+that isn't writable, is left for you to edit: `doctor` drops the `--config` clause from
+that repair where it knows the rewrite would decline, and `update --config` says
+`edit by hand` and why. See [mindmeld update](commands/update.md#config-drift).
 
 ## `[sync]`
 
@@ -486,15 +509,21 @@ executor, recording a blank executor id — rather than silently sharing a
 mapped executor with another class. What to actually put in these three
 values is your installed adapter's own answer — see its
 `adapters/<adapter>/notes.md` for a worked mapping against that harness's
-real roster.
+real roster. `mindmeld doctor` carries the same answer to you: each unmapped
+class line ends in the entries to add, taken from the adapter (for
+`claude-code`, `mechanical = "haiku", balanced = "sonnet", deep = "opus"`),
+and points at `notes.md` for any class the adapter has no unambiguous
+suggestion for. See
+[mindmeld doctor](commands/doctor.md#executor-class-mapping).
 
 Not read from this table, but resolved alongside it whenever `doctor` diagnoses a
 host: the adapter's own declared capabilities, stamped into your KB at
 `{kb.root}/adapters/<adapter>/manifest.json` the same marker-guarded way notes.md is
-(`internal/initrun`, the adapter-notes step). `chunk.declare`'s driver reads that
-file's contents directly as the manifest to declare; `mindmeld doctor` reads it too, to
-report — before a session ever declares a chunk graph — which of the resolved KB
-routing policy's class targets and floors (`mindmeld://policy/chunk-routing`, this
+(`internal/initrun`, the adapter-notes step). `chunk.declare` reads the stamped copy
+as the default manifest and the ceiling an explicit one may only narrow;
+`mindmeld doctor` reads it too, to report — before a session ever declares a chunk
+graph — which of the resolved KB routing policy's class targets and floors
+(`mindmeld://policy/chunk-routing`, this
 section's own sibling table) the manifest's own `classes` list actually offers. See
 [mindmeld doctor](commands/doctor.md#adapter-manifest-and-host-diagnostics) for the
 full set of lines this produces.
@@ -511,8 +540,8 @@ the server today.
 | --- | --- | --- | --- | --- |
 | `rituals_enabled` | array of strings | optional | unset — every embedded ritual kind is enabled | reserved; not read yet. A candidate key for the day ritual definitions externalize (MIN-3), so a KB can narrow which kinds `ritual.start` accepts |
 
-An omitted `[mcp]` table is the common case and changes nothing: `mindmeld
-mcp` always serves the full tool surface `Surface()` reports, regardless of
+An omitted `[mcp]` table is the common case and changes nothing:
+`mindmeld mcp` always serves the full tool surface `Surface()` reports, regardless of
 whether this table is present.
 
 ## The KB instance
@@ -704,8 +733,9 @@ Invariants that hold across the whole surface:
 - No `sudo`, and no writes outside the six host paths above plus
   `{kb.root}`.
 - **`doctor` is read-only against this same surface.** It reports on drift or
-  missing pieces; it never repairs anything itself — repair means re-running
-  `init`, or `mindmeld update` (below).
+  missing pieces; it never repairs anything itself — repair means
+  `mindmeld update` (below) on an initialized instance, and `init` only before
+  one exists.
 
 ## `doctor`: ownership, not mere existence
 
@@ -715,18 +745,21 @@ something is there. Per skill, it reports one of four states:
 - **linked to checkout** — a symlink resolving to `<repo>/skills/<name>`. The
   healthy state.
 - **linked elsewhere** — a symlink, but to a different target (another sync
-  system got there first). Warn — run `mindmeld init`.
+  system got there first). Warn — run `mindmeld update`.
 - **installed as a real path** — a real file or directory, not a symlink.
   This is `--copy`'s normal shape (a supported install posture), so it's a
   warn, not a failure — but it's also what a foreign writer clobbering the
-  link looks like, so the fix is the same either way: run `mindmeld init`.
+  link looks like, so the repair offers both: `mindmeld update`, or
+  `mindmeld update --copy` to keep a copy install a copy.
 - **missing or dangling** — nothing there, or a symlink whose target is gone.
   The one state that's an actual error.
 
 `[kb] owner` gets the same treatment. `doctor` doesn't just stat
 `people/{owner}/` and stop — it separately checks whether that directory is
 the KB's own identity home, and warns when the KB carries more than one
-identity home, an ambiguity it won't guess through. "The configured owner's
+identity home, an ambiguity it won't guess through. An unset owner next to exactly one
+identity home, and a configured owner that disagrees with it, each carry the hand edit
+that fixes them (`set [kb] owner = "<home>" in mindmeld.toml`). "The configured owner's
 home exists" and "the configured owner matches the KB's identity home" are
 different questions; only the second one catches a machine that quietly
 scaffolded a sibling identity instead of adopting the one already there.
@@ -739,12 +772,17 @@ plane.
 
 ## `mindmeld update`
 
-`mindmeld update [--dry-run] [--copy]` brings the mind current: fast-forward
-the checkout (`git pull --ff-only`, skipped with a warning if there's no
-upstream or the tree has local changes — it never stashes, forces, or
-rebases over a stranded edit), then re-run the same adapter install `init`
+`mindmeld update [--dry-run] [--copy] [--config]` brings the mind current:
+fast-forward the checkout (`git pull --ff-only`, skipped with a warning if
+there's no upstream or the tree has local changes — it never stashes, forces,
+or rebases over a stranded edit), then re-run the same adapter install `init`
 uses, which repairs any skill that drifted back to a real path or a foreign
-symlink. If the checkout was originally installed with `init --copy`, pass
+symlink. It goes on to converge the rest of an existing instance — the guide,
+the copy-if-absent KB scaffold, the hot cache, the qmd collections (registered
+and excluded, never embedded), the boards and templates — which is why it's the
+repair `doctor` names once an instance exists. A configured `[kb].root` that doesn't
+exist skips all of those KB steps with one warning pointing at `mindmeld init`; the pull,
+the adapter install and the config check still run. If the checkout was originally installed with `init --copy`, pass
 `--copy` to `update` too — otherwise it re-links a copy install into a
 symlink one, which isn't drift, it's a different posture than the one you
 chose.

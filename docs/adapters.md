@@ -28,10 +28,10 @@ a doc, a directory the engine ships and the release tarball stages. Inside it:
   `chunk.Manifest`: whether it has children, runs them in parallel, at what
   `max_concurrency`, whether it can pick a class per child, what `classes` it can fill,
   whether it can steer a live child or keep one durable, and what context and tools it
-  provides. `chunk.declare`'s driver declares this file's contents verbatim, and
-  `mindmeld doctor` reads the same file to diagnose the host against the resolved KB
-  routing policy before a session starts. It is a fact about the harness, so it ships
-  with the adapter rather than being composed by hand from `notes.md` prose.
+  provides. `chunk.declare` reads the stamped copy as both the default manifest and its
+  ceiling, and `mindmeld doctor` reads the same file to diagnose the host against the
+  resolved KB routing policy before a session starts. It is a fact about the harness, so
+  it ships with the adapter rather than being composed by hand from `notes.md` prose.
 - **A worked `[execution.classes]` mapping, in `notes.md`.** The engine treats the
   `mechanical`/`balanced`/`deep` values in `mindmeld.toml` as opaque strings — it copies
   them onto assignments and never interprets them — so what to put there for this
@@ -92,9 +92,9 @@ Six concrete things:
    both.
 3. **An install branch.** `initrun`'s adapter step resolves the name through
    `host.ResolveAdapter` and then always runs `installClaudeCodeAdapter`; a name that
-   doesn't resolve is not skipped but fails the run (`initrun: unsupported [install]
-   adapter`), with a repair line listing the supported names. A second adapter needs its
-   own installer, selected by name at that call instead of the unconditional one.
+   doesn't resolve is not skipped but fails the run
+   (`initrun: unsupported [install] adapter`), with a repair line listing the supported
+   names. A second adapter needs its own installer, selected by name at that call instead of the unconditional one.
 4. **A `host.Adapter` implementation, registered as that entry's constructor.** This is
    registration only — the fourth thing an adapter owns, above — and it's deliberately
    scoped narrower than item 3: skills, hooks, and the instruction shim stay
@@ -102,11 +102,13 @@ Six concrete things:
    of the install step. A second adapter gets a working `mindmeld mcp` registration
    without waiting on that generalization, but nothing else for free.
 5. **A `manifest.json`, stamped like `notes.md`.** The shipped `adapters/<name>/manifest.json`
-   is what the engine and `doctor` read after the stamp step copies it into the KB; an
-   adapter without one has nothing for `chunk.declare` to declare, and a missing file is
-   a warning at install time, not an adapter the engine can run chunks against. Fill in
-   its `classes` truthfully — they are what routing refuses or accepts against — and
-   document the `[execution.classes]` mapping for your roster in `notes.md`.
+   is what the engine and `doctor` read after the stamp step copies it into the KB.
+   `chunk.declare` parses the stamped copy strictly (an unknown key is refused) and uses
+   it as both the default manifest and the ceiling an explicit one may only narrow. An
+   adapter without one can't run chunks — `chunk.declare` refuses `manifest_unavailable`
+   — and a missing file is a warning at install time. Fill in its `classes` truthfully —
+   they are what routing refuses or accepts against — and document the
+   `[execution.classes]` mapping for your roster in `notes.md`.
 6. **Answers to the questions `adapters/claude-code/notes.md` poses.** Each fact in that
    file — how this harness's worktree-leasing and diff panel behave, how it resolves an
    installed skill back to its source checkout, whether it reads a neutral instructions

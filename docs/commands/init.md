@@ -6,6 +6,13 @@ the friction that makes an idea not worth adopting. `init` is that whole ritual 
 pass, and every step is additive-idempotent: re-running it against an already-set-up
 machine is a no-op walk, never a second copy of anything.
 
+`init` is the first-install command. Once an instance exists — a config that loads and a
+KB root that validates — [`mindmeld update`](update.md) is how it stays current, and it's
+what [`doctor`](doctor.md) names as the repair for everything `update` performs. `init`
+is still the command `doctor` points at before any instance exists: a missing config, a
+missing KB root. Re-running it on an existing machine is safe, but it asks the first-run
+questions again; `update` doesn't.
+
 ## Usage
 
 ```bash
@@ -75,7 +82,8 @@ names two next steps: `mindmeld doctor`, then `mindmeld docs getting-started`.
 
 ## Related
 - [mindmeld doctor](doctor.md) — run this next; checks everything `init` just wired
-- [mindmeld update](update.md) — the repeatable half of `init`, for an existing install
+- [mindmeld update](update.md) — where an existing instance goes from here: the same
+  adapter, scaffold, guide and index steps, converged without prompting
 - [mindmeld docs](docs.md) — the guide `init`'s docs step stamps into your KB
 - [Configuration](../config.md) — the full host-path and KB-instance reference
 - [Adapters](../adapters.md) — what the install step's adapter half actually owns

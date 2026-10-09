@@ -26,4 +26,4 @@ mindmeld init
   your first session.
 
 This repo's README and docs/ are rendered by the mindmeld release pipeline
-(currently v0.4.0); edits here are overwritten on the next release.
+(currently v0.4.1); edits here are overwritten on the next release.

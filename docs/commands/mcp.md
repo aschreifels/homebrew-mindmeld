@@ -197,7 +197,21 @@ families — 21 tools in all:
   declare (or re-declare) a chunk DAG and its capability manifest, claim a chunk with
   a proposed `assignment`, report how an open attempt closed, or reroute a chunk's
   execution request after a trigger fires, or record the user's decision that a stale
-  chunk stays accepted. `chunk.report` additionally takes an
+  chunk stays accepted. `chunk.declare`'s `manifest` is optional: omit it (or pass
+  `null`) and the engine declares the active adapter's stamped manifest
+  (`adapters/<adapter>/manifest.json` in the KB), clamped to the run's capability
+  ceiling — a run started without `delegation` gets a childless manifest. An explicit
+  `manifest` must be a full manifest that only narrows the stamp; one that claims more
+  (a flag the stamp lacks, a higher `max_concurrency`, a class or `provided_*` entry it
+  doesn't list) is refused `manifest_exceeds_host`, naming the field, and is never
+  clamped — past that check, a manifest wider than the run's ceiling is refused
+  `gate_unsatisfied` as always. The stamp is read on every non-replayed declare; one that
+  is missing, symlinked, unreadable, or fails a strict parse (an unknown key, trailing
+  data, an invalid manifest) is refused `manifest_unavailable`, naming the KB-relative
+  path and the cause — run `mindmeld update`, or, for a hand-edited copy that lost its
+  marker, fix the copy (`update` won't overwrite it). The declare event journals where
+  the manifest came from (`adapter` or `explicit`, the adapter name, the stamp's
+  version). `chunk.report` additionally takes an
   `evidence` object (typed proof — schema, the command run, whether it passed, a
   short detail — alongside the freeform `report` prose) and a `disposition`
   (`applied` | `declined` | `superseded`, with a required `disposition_reason` when
@@ -305,7 +319,7 @@ this same shape with an `error` field naming the kind — `revision_conflict |
 gate_unsatisfied | run_unknown | run_conflict | ambiguous_run |
 unsupported_definition | unsupported_capability | invalid_coordinate |
 archive_root_overlap | archive_destination_exists | archive_path_unsafe |
-idempotency_conflict | internal` —
+idempotency_conflict | manifest_unavailable | manifest_exceeds_host | internal` —
 never a bare failed call that throws away the run's current state. A version
 refusal carries the supported list; a `run_conflict` carries the mismatched field
 names and the existing run's id; an `ambiguous_run` refusal comes from a

@@ -160,6 +160,55 @@ attempt's own chunk required when it claimed (see "A re-declared `Manifest` is c
 same way" below), and this third check runs against every open attempt's mode, not just
 delegated ones.
 
+### The adapter's stamped manifest is the declare default and its ceiling
+
+A declared `Manifest` sits under three layers, each only able to narrow the one above:
+the run's capability ceiling (what the run declared at start), the adapter's stamped
+manifest (what this host actually does), and the manifest the run declares. The plane
+resolves the last one itself, in `internal/mcp`, because the alternative put the work on
+the driver: the stamped copy carries `mindmeld_*` provenance keys, the declare schema is
+strict, and a verbatim pass fails — so drivers hand-copied fields, which is how a
+manifest drifts from the host it describes.
+
+`manifest` omitted declares the stamp clamped to the run's ceiling
+(`Manifest.ClampToCeiling`, through the same predicate `WithinCeiling` uses). Clamp
+rather than refuse: a run that declined `delegation` shouldn't be blocked from simply
+omitting the field, and the childless manifest it gets is the honest one. An explicit
+`manifest` is a full manifest that may only narrow the stamp (`Manifest.WithinHost`,
+refused `manifest_exceeds_host`) and is never clamped — past the host check, a manifest
+wider than the ceiling is refused exactly as it always was. The stamp is read on every
+non-replayed declare, explicit or not, since it is what makes the ceiling real; a keyed
+replay returns the journaled result without touching it, and a keyless re-declare
+re-resolves from the current stamp, because the manifest is per-session state.
+
+Both strict edges stay strict. The declare schema still refuses an unknown key, and
+`ParseStampedManifest` refuses one in the stamp too — a typo'd field would otherwise
+read as its zero value and quietly declare a weaker host. It refuses a repeated key as
+well (`duplicate key`), since the last occurrence would silently win and the stamp's
+meaning would depend on key order. Every failure to read or parse the stamp is
+`manifest_unavailable`, never `internal`: it is install state the reader repairs, not an
+engine fault. The repair depends on the cause: a missing or unmarked-and-invalid stamp is
+`mindmeld update` or a fix to the hand-edited copy it won't overwrite; a symlink,
+directory, or other irregular path is one `update` leaves alone, so the advice is to
+replace it with a regular file first; a permissions failure is the file's to fix. The
+refusal names the KB-relative path (`initrun.AdapterManifestRel`, the one spelling the
+stamper, doctor, and declare share).
+
+`doctor` calls the same parser, so a stamp it warns on is one declare refuses; it stays
+silent on a missing file where declare refuses, because its freshness check already
+reports that. The declare event journals where the manifest came from (`adapter` or
+`explicit`, the adapter name, the stamp's version) for readers of the journal; nothing
+folds or serves it.
+
+The order matters: a declare the ritual or phase can't take (a phase outside the chunk
+window, a ritual with none, an open blocker) is refused with `ritual.Apply`'s own
+wording before the stamp is read, so a doomed declare never reports an install problem
+first. When an omitted-manifest declare then fails a live-state conflict against open
+attempts, the refusal adds that the adapter's stamped manifest now declares it — the
+driver never sent that value — while an explicit manifest's conflict is left as is. The
+clamp empties `classes` to `[]`, never `null`, so a clamped manifest and an explicit
+childless one are the same on the wire.
+
 ### The engine resolves an assignment; it never picks one
 
 A host proposes a class and a mode; `Resolve` either accepts the pairing or refuses it,
@@ -657,6 +706,10 @@ project filter matching nothing, is a legitimate empty aggregate, not a not-foun
   replaces without touching a call site.
 - `main-thread` is reserved across the whole package: unranked, never a legal minimum, and
   always a legal terminal rung for a fallback chain.
+- Omitted and explicit-equal `manifest` declare the same manifest; only the journaled
+  origin differs.
+- An explicit manifest never widens the stamp, and the run's ceiling still applies on top
+  of either path — the stamp is not a bypass.
 
 ## Related
 - [mindmeld mcp](../commands/mcp.md) — the five chunk verbs' wire shape and refusal kinds

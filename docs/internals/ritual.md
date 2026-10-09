@@ -216,6 +216,45 @@ journaling the answer durably, rather than leaving it to be inferred later or
 carried only in chat context, means a host resuming a run with no prior
 conversation doesn't have to guess at that destructive-if-wrong choice.
 
+### Served resources answer "what has this phase's gate recorded"
+
+`Action.Resources` (built by `resourcesFor`, threaded unchanged onto every fallback
+rung) lists what the current phase's gate already covers. For each kind the phase
+produces it serves the ledger entries recorded since the phase was entered — the same
+`Seq >= PhaseEnteredSeq` cut `HasArtifactSince` makes for the gate — minus anything
+superseded, deduped by artifact ID and then by URI within the kind (the last recording
+wins, and sits at its later `Artifact.Seq`). The URI pass matters because the engine mints
+a fresh ID per `ritual.submit`: a driver reads the list as the set of things the gate
+covers, and a file recorded twice is one thing. Order is the phase's `PhaseDef.Produces` order, then `Artifact.Seq` within a kind. Nothing
+recorded yet is `nil`, never a slice of empty refs.
+
+How many of a kind survive is declared per kind, not inferred from `supersedes`:
+
+| Kind | Cardinality | Why |
+|---|---|---|
+| `manifest`, `plan`, `review-findings`, `handoff` | singular — latest only | each new one revises the one before |
+| `adr`, `contract`, `chunk-brief`, `chunk-report`, `spec` | plural — every entry | each is a distinct seam, decision, chunk, or spec |
+
+`ArtifactKind.Plural` is a closed switch; every other kind, including any string
+`ritual.submit` let through, is singular, so the conservative answer never fans out.
+It's declared because a plural kind's entries don't point at each other — two contracts
+for two seams never supersede anything — so `supersedes` alone can't tell "revision" from
+"sibling." Plural kinds are uncapped: in `execute` that's a brief and a report per
+recorded chunk, and a revision attempt's report that should replace an earlier one is
+the driver's to mark with `supersedes`.
+
+Supersession is still ledger-wide and cross-kind, as `Run.LatestArtifact` computes it.
+If it would hide every in-phase entry of a kind (a cycle), that kind is served with
+supersession ignored — a kind the phase holds is never reported empty.
+
+This replaced one-ref-per-kind via `LatestArtifact`, which was run-wide rather than
+phase-scoped and right only for singular kinds. It collapsed a dossier's several
+contracts and `execute`'s several briefs and reports to one each, and it leaked a
+dossier's contract into `contracts-landing` while that phase's gate still refused for
+lack of a landing one. The behavior change to expect: **`contracts-landing` serves
+nothing until a landing contract is recorded.** The dossier's contracts stay reachable
+through the run's artifacts resource, which is still the whole ledger.
+
 ## Invariants
 
 - Phase order is total within a `Definition`; a structural change of any kind bumps
@@ -246,6 +285,10 @@ conversation doesn't have to guess at that destructive-if-wrong choice.
 - `Run.LatestArtifact` never reports "not found" for an `ArtifactKind` the ledger
   actually holds: a genuine `Artifact.Supersedes` cycle falls back to the
   last-recorded entry of that kind rather than filtering every entry away.
+- `Action.Resources` never lists an artifact recorded before `Run.PhaseEnteredSeq` — the
+  gate's own cut — and a singular kind serves at most one ref while a plural kind
+  (`ArtifactKind.Plural`) serves every surviving entry; fallback rungs carry the
+  identical slice.
 - Evidence bodies live in `Run.Evidence` in full; what a caller renders from them (for
   example, omitting bodies from a polled status view) is that caller's own wire-shape
   choice, not a rule this package enforces.
