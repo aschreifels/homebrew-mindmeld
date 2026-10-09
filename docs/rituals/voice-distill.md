@@ -34,7 +34,7 @@ were given, it says so and stops.
 
 | path | what changes |
 |---|---|
-| `people/{owner}/voice.md` | rewritten body, `updated:` bumped — loaded via the CLAUDE.md `@` include every session |
+| `people/{owner}/voice.md` | rewritten body, `updated:` bumped — loaded via the AGENTS.md `@` include every session |
 | `people/{owner}/voice/<date>.<host>.md` | each folded day-log flips `status: needs-distillation` → `status: distilled` — never deleted or moved |
 
 `owner` resolves from `[kb].owner`; the identity home is `{kb.root}/people/{owner}/`.
@@ -50,9 +50,9 @@ were given, it says so and stops.
    writing anything.
 4. **Commit** — write `voice.md`, flip the folded day-logs to `distilled`, then run
    the KB landing pass: `mindmeld lint --changed` (a non-zero exit is a stop — fix
-   the reported files and re-run), reindex with `qmd update` when `qmd` is present,
-   then `git add` + `git commit` in the KB. The commit is what carries the new voice
-   to your other machines.
+   the reported files and re-run), reindex with `mindmeld reindex` when
+   `mindmeld` is present, then `git add` + `git commit` in the KB. The commit is
+   what carries the new voice to your other machines.
 5. **Report** — what moved in `voice.md`, how many day-logs folded, final line
    count vs. cap.
 

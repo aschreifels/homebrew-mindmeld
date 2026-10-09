@@ -55,8 +55,8 @@ flowchart LR
 Skills install as symlinks back into the installed engine — a Homebrew
 keg's `libexec` for most adopters — not copies. `brew upgrade mindmeld`
 bumps the engine; `mindmeld update` then reinstalls the adapter so every
-symlink repoints, re-stamps the guide, and syncs the seed-tracked boards —
-there's no separate updater and no version to fall out of sync with.
+symlink repoints, re-stamps the guide, and syncs the seed-tracked boards and
+templates — there's no separate updater and no version to fall out of sync with.
 `doctor` classifies every installed skill rather than just testing that
 something's there — linked to checkout, linked elsewhere, installed as a
 real path, or missing — so drift is a reported line, not a silent failure
@@ -71,6 +71,57 @@ themselves are written harness-agnostic — the direction is that they travel
 to whatever agent runtime you're running, not just this one. The adapter
 seam (`[install]` in `mindmeld.toml`) is what `init` and `doctor` use to
 find and wire up host tooling; see [Configuration](config.md) for its keys.
+
+## Executor classes and routing
+
+A session's work can be carved into chunks and dispatched through a small, portable
+vocabulary instead of a vendor's own model names: `mechanical`, `balanced`, `deep`, and
+`main-thread`. The first three are ranked calibers a chunk can ask for a minimum of;
+`main-thread` is a different axis entirely — it names *who* executes (the session
+itself, rather than a delegated child) instead of how capable the executor is, so it's
+never compared against a minimum and is always the rung a fallback chain can terminate
+on.
+
+That vocabulary answers a different question than a chunk's complexity does, and keeping
+them separate is deliberate. Complexity (trivial/standard/complex) describes how big an
+edit is; an execution request describes who should run it — and a small change at a
+sensitive path is exactly where those two answers diverge: mechanically trivial, and not
+work handed to the cheapest available executor on size alone. Two fields instead of one
+scalar is what lets a request stay right when an edit's size and its blast radius
+disagree.
+
+Routing a chunk into that vocabulary splits the same way the [code-docs
+policy](config.md#config-vs-kb--the-delineation) already does. What caliber a kind of
+chunk deserves is a preference true on every machine you work from, so it lives in your
+KB as a policy file (`policy/chunk-routing.md`); what this particular box can actually
+fill a request with is a fact about the machine, so it lives in `mindmeld.toml`'s
+`[execution.classes]` table instead. See [Configuration](config.md#execution) for that
+table's keys, and [mindmeld doctor](commands/doctor.md#executor-class-mapping) for how a
+collapsed or unmapped class mapping gets reported.
+
+The policy file's rules apply once, when a chunk is declared, and come in two kinds that
+behave differently on purpose. A rule setting a minimum composes a **floor**, an
+engine-owned value the routing policy alone writes onto the chunk's execution
+request — a chunk that already states its own floor is refused outright, naming the
+chunk, since it is not the caller's to state. The floor binds harder than an ordinary
+minimum: it survives every later reroute (a route may lower a chunk's caliber, but
+never below its own floor), and a routing entry — stated on the chunk or filled in by
+policy — that could ever land the chunk below it is refused at declare, naming the
+rule that set it. A rule setting a class is a **default**: it only ever fills in a
+preferred class the chunk left unset, clamped up to the floor when the result would
+otherwise land below it, and never overrules a class the chunk states. A
+`contract-question` rule is a third case, and not really a preference at all: contract
+or product judgment always returns to the main thread, so the engine refuses any rule
+— spec or policy — routing that trigger anywhere else, the same way it refuses one
+for `chunk.reroute` to honor if it somehow existed. Leaving the policy file unwritten
+resolves to this engine's own built-in defaults; writing one that doesn't parse refuses
+the declare instead of silently falling back to those defaults — a misspelled rule is a
+loud failure, not a rule that stopped applying. That includes a rule's own `when`: it
+must be either a known trigger (`contract-question`, `failed-verification`, ...) or a
+`<trait>:<value>` pair from the same closed vocabulary a chunk's own traits are checked
+against (`complexity`, `risk`, `judgment`, `context_scope`, each with its own closed set
+of values) — `riks:high` or `risk:hgih` refuses the whole policy file, naming the rule,
+rather than silently compiling into a rule that can never match anything.
 
 ## Recall
 

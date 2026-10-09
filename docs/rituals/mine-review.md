@@ -51,9 +51,9 @@ always requires `--reason`.
 3. **Review** — `mine review --json`: every candidate gated in but not yet
    promoted or rejected. You arbitrate every promotion; the skill only presents
    its own read, it never calls `promote` unattended.
-4. **Landing pass** — `qmd update` (when `qmd` is present) to make a promotion
-   recallable, then `git add` + `git commit` in the KB. A promoted candidate isn't
-   really in the KB until this runs.
+4. **Landing pass** — `mindmeld reindex` (when `mindmeld` is present) to make a
+   promotion recallable, then `git add` + `git commit` in the KB. A promoted
+   candidate isn't really in the KB until this runs.
 5. **Report** — sessions surveyed, how many mined and by which extractor, bundles
    deferred to sub-agents and what each wrote, candidates promoted vs. rejected
    with reasons, and the final queue state. An empty queue or an all-empty mining

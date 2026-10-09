@@ -9,12 +9,14 @@ machine is a no-op walk, never a second copy of anything.
 ## Usage
 
 ```bash
-mindmeld init [--defaults] [--copy] [--no-hook] [--dry-run] [--kb PATH] [--kb-remote URL]
+mindmeld init [--defaults] [--copy] [--no-hook] [--no-mcp] [--dry-run] [--kb PATH] [--kb-remote URL]
 ```
 
 - `--defaults` — accept every default without prompting
 - `--copy` — copy instead of symlink
 - `--no-hook` — skip wiring the SessionStart hook
+- `--no-mcp` — skip registering the mcp control plane; mirrors `--no-hook`, and forces
+  `[install].mcp` to `print` for this run regardless of what's configured
 - `--dry-run` — report what would happen without writing
 - `--kb PATH` — override the KB root for this run
 - `--kb-remote URL` — clone the KB from this git URL if the KB root is empty (flag beats
@@ -34,7 +36,14 @@ Nine steps, in order, each reported as its own `✓`/`−`/`✗ [step] message` 
 | docs | `{kb.root}/docs/mindmeld/*.md` — the guide, stamped into your KB | re-stamps only pages that changed; a page you edited (no marker) is never touched — see [mindmeld docs](docs.md) |
 | hot | `{kb.root}/wiki/_hot.md` | regenerates in place; declining the prompt just defers to the first session's hook run |
 | index | registers the KB-root qmd collection plus the `candidates`/`patterns` scoped collections | `qmd collection add` treats "already exists" as OK, not an error |
-| install | symlinks (or copies, with `--copy`) the six session skills and the pulse hook into `~/.claude/`, wires the `SessionStart` hook | every write is preceded by an existence check; a collision is backed up, never overwritten |
+| install | symlinks (or copies, with `--copy`) the six session skills and the pulse hook into `~/.claude/`, wires the `SessionStart` hook, and — only when `{kb.root}/AGENTS.md` already exists — generates `{kb.root}/CLAUDE.md` as a two-line shim (`@AGENTS.md`), since this harness hard-codes that filename. Last inside this step: registers the `mindmeld mcp` control plane with the harness (see below) | every write is preceded by an existence check; a collision is backed up, never overwritten; the shim is skipped, never forced, when its target is missing |
+
+Registering the control plane rewrites `~/.claude.json`, a file `init` doesn't own — so
+under `[install].mcp = "auto"` (the default) it asks first, whenever a human is at the
+keyboard: `--defaults` never constructs a prompter at all, the same as every other
+prompt this command asks, so a scripted `init --defaults` registers without a pause.
+`--no-mcp` and `[install].mcp = "print"` skip the prompt entirely and print the command
+to run by hand instead; `[install].mcp = "off"` skips registration altogether.
 
 Full host-path surface, every path `init` may touch and nothing outside it:
 [What init touches](../config.md#what-init-touches-claude-code-adapter).
@@ -60,7 +69,7 @@ names two next steps: `mindmeld doctor`, then `mindmeld docs getting-started`.
 ## Config it reads
 
 `[kb]` (root, owner, remote_url), `[defaults]` (branch_prefix, base_branch), `[install]`
-(adapter, skills_dir, hooks), `[mining.recurrence]` (the scoped-collection names) — see
+(adapter, skills_dir, hooks, mcp), `[mining.recurrence]` (the scoped-collection names) — see
 [config.md#kb](../config.md#kb), [config.md#defaults](../config.md#defaults),
 [config.md#install](../config.md#install), [config.md#mining](../config.md#mining).
 
@@ -69,3 +78,4 @@ names two next steps: `mindmeld doctor`, then `mindmeld docs getting-started`.
 - [mindmeld update](update.md) — the repeatable half of `init`, for an existing install
 - [mindmeld docs](docs.md) — the guide `init`'s docs step stamps into your KB
 - [Configuration](../config.md) — the full host-path and KB-instance reference
+- [Adapters](../adapters.md) — what the install step's adapter half actually owns

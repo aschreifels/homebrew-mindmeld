@@ -11,9 +11,10 @@ pause point, and the report lines.
 /spawn-session my-cool-feature ENG-1234
 ```
 
-The session runs nine phases: **parse → ticket → branch → dossier → contracts →
-orchestrate → behavioral pass → self-review → integrate & close**. A ticket handle
-is optional — `/spawn-session my-cool-feature` works without one.
+The session runs through the engine's own ritual — **open → dossier → contracts
+landing → execute → behavioral → self-review → integrate** — pausing at the dossier
+gate for your plan signoff and again at self-review for findings arbitration. A
+ticket handle is optional — `/spawn-session my-cool-feature` works without one.
 
 The branch gets named from what you passed:
 
@@ -26,8 +27,9 @@ The branch gets named from what you passed:
 
 The session writes a planning dossier outside the repo, symlinked into the
 worktree as `_plan/`. `MANIFEST.md` is the living index — its frontmatter tracks
-session state (`state: planning | awaiting-signoff | executing | behavioral |
-integrating | wrapped`), the live chunk map, and the open-question count:
+session state (`state: open | dossier | contracts-landing | execute | behavioral
+| self-review | integrate | wrapped` — the plane's own phase ids, not a
+translated set), the live chunk map, and the open-question count:
 
 ```text
 _plan/
@@ -61,13 +63,15 @@ Nothing gets coded until you answer.
 
 ## Execution, then self-review
 
-Once you give the word, chunks run through the standard loop — brief, spawn a
-Sonnet sub-agent, review the diff, accept, commit — one chunk at a time or in
-parallel groups where the file sets don't overlap. After every chunk lands, a
-behavioral pass and a self-review follow.
+Once you give the word, chunks run through the standard loop — brief, execute
+(delegated to a sub-agent by default, or inline under `--solo` — the
+session asked which at open, and that answer holds for the rest of the run),
+review the diff, accept, commit — one chunk at a time or in parallel groups
+where the file sets don't overlap. After every chunk lands, a behavioral pass
+and a self-review follow.
 
 Self-review runs `pr-review` in self-review mode against the branch. It writes a
-punch list to `.claude-review/branch-<branch>.md` — findings grouped by severity
+punch list to `.mindmeld-review/branch-<branch>.md` — findings grouped by severity
 with stable IDs (`B1`, `H2`, …) — and lets you steer it in plain language:
 `drop B2`, `fix B1` (previews the edit, asks before applying), `fix all B`,
 `commit` (drafts a commit message). It never pushes and never applies a fix
@@ -79,14 +83,14 @@ without your yes.
 /wrap-session
 ```
 
-or `/wrap-session my-cool-feature --delete-branch`. Wrap runs safety checks first (any
-uncommitted or unpushed work stops it, unless you pass `--force`), then finalizes
-the ticket, harvests reusable docs to the KB, removes the worktree, and reports a
-tight summary:
+or `/wrap-session my-cool-feature --delete-branch`. Wrap runs safety checks first —
+any uncommitted or unpushed work stops it and hands the decision back to you, and no
+flag skips that — then finalizes the ticket, harvests reusable docs to the KB, removes
+the worktree, and reports a tight summary:
 
 ```text
 - **Worktree:** removed at `<path>`
-- **Dossier:** archived to `<dossier_dir>/_archive/<repo>/<name>`
+- **Dossier:** archived to `<dossier_archive_dir>/<repo>/<name>` (a sibling root outside `<dossier_dir>`)
 - **Session archive:** captured / failed (reason) — never blocks
 - **Branch:** deleted / kept (`<branch>`)
 - **Ticket:** finalized / comment posted on `<TICKET>` / skipped (reason)
@@ -96,7 +100,7 @@ tight summary:
 - **Voice:** captured N note(s) to the corpus / skipped (no signal)
 - **KB landing pass:** committed `<sha>` (`<N>` file(s)) / nothing to land
 - **Sync:** N commit(s) pushed / already up to date / refused (`<reason>`) / failed (`<reason>`)
-- **Warnings:** anything left behind (e.g. stashed changes, unpushed commits user chose to leave, etc.)
+- **Warnings:** anything left behind that the wrap did not own (e.g. files a peer session left dirty in the KB)
 ```
 
 Before wrap ever runs, the session itself opens a draft PR as its own closing

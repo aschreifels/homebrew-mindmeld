@@ -36,8 +36,8 @@ self-review.
 
 | file | mode | contents |
 |---|---|---|
-| `.claude-review/PR-<num>.md` | PR | verdict, routing line, findings by severity |
-| `.claude-review/branch-<branch-slug>.md` | self-review | status, scope, findings by severity |
+| `.mindmeld-review/PR-<num>.md` | PR | verdict, routing line, findings by severity |
+| `.mindmeld-review/branch-<branch-slug>.md` | self-review | status, scope, findings by severity |
 
 Both are appended to `.gitignore` on first write — the file is a working draft for
 your editor, not something you'd commit.

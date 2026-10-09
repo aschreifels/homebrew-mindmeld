@@ -23,7 +23,7 @@ actually reach for.
 
 - [spawn-session](rituals/spawn-session.md) — Opens a coding session: worktree, branch, ticket context, and a plan dossier you sign off on before code exists.
 - [wrap-session](rituals/wrap-session.md) — Closes a coding session: safety checks, ticket finalize, KB harvest, voice capture, worktree teardown.
-- [kb-ticket](rituals/kb-ticket.md) — Manages tickets as markdown files in your KB — no tracker, no MCP connector, just git.
+- [kb-ticket](rituals/kb-ticket.md) — Manages tickets as markdown files in your KB — no external tracker, no third-party connector, just mindmeld's own plane and git.
 - [pr-review](rituals/pr-review.md) — Human-in-the-loop code review — PR or self-review mode, findings by severity, nothing posted or applied without confirmation.
 - [voice-distill](rituals/voice-distill.md) — Compress the day-log voice corpus into the curated voice.md loaded every session.
 - [mine-review](rituals/mine-review.md) — Drive mindmeld mine end to end — survey, mine, then walk the review queue and decide.
@@ -35,16 +35,21 @@ actually reach for.
 - [mindmeld update](commands/update.md) — Bring the mind current: pull the checkout, reinstall organs, refresh the guide
 - [mindmeld hot](commands/hot.md) — Regenerate the session-start pulse cache
 - [mindmeld lint](commands/lint.md) — Validate the KB's frontmatter against a schema, and reconcile the index
+- [mindmeld codedocs](commands/codedocs.md) — Gate a repo's source documentation against docs/internals/_index.md
 - [mindmeld mine](commands/mine.md) — Turn agent sessions into candidate KB drafts, gated on specificity
+- [mindmeld reindex](commands/reindex.md) — Reindex the qmd index — qmd update, then qmd embed, under the lock
 - [mindmeld sweep](commands/sweep.md) — Turn a git changeset into pattern candidates for review
 - [mindmeld sync](commands/sync.md) — Pull, reconcile, and push your KB against its git remote
 - [mindmeld host](commands/host.md) — Print this machine's stable identity
 - [mindmeld docs](commands/docs.md) — Read the mindmeld guide from your terminal or your KB
+- [mindmeld mcp](commands/mcp.md) — Serve the ritual/ticket/recall control plane over MCP
 
 ## Reference
 
 - [Configuration](config.md) — Every mindmeld.toml key — what it does, who reads it, and its default
 - [Troubleshooting](troubleshooting.md) — Symptom, cause, and fix for every warn or fail mindmeld doctor reports
+- [The KB schema](kb-schema.md) — Directory layout, frontmatter conventions, and the operations mindmeld exposes on top of them
+- [Adapters](adapters.md) — What an adapter owns, and what adding a second one actually takes
 
 ## Reading this in the terminal
 

@@ -24,9 +24,29 @@ Resolves `--base...--head` (default: `[defaults].base_branch`, else `"main"`, th
 `HEAD`) into a diff, filters it, and writes a bundle directory under
 `{kb}/.mindmeld/work/` for a sweep agent to read: a `diff.md`, a generated `BRIEF.md`
 scoped to `type: pattern`, and a `ref.json` recovery record. `--repo` targets a worktree
-other than the current directory. A diff that's empty after filtering (nothing changed,
-or everything changed was filtered) is reported and no bundle is written — that's a
-valid, meaningful outcome, not a failure.
+other than the current directory.
+
+Before diffing, `sweep bundle` also asks whether `head` is already merged into `base` —
+wrapping after a PR has landed is common, and the naive `base...head` range is empty by
+construction in that case, which used to read identically to "nothing changed." It no
+longer does; there are four outcomes now, and `--json` always names which one you got
+via a `merged` field:
+
+- **Nothing to sweep.** The diff is empty after filtering (nothing changed, or
+  everything changed was filtered) and the branch isn't merged. Reported, no bundle
+  written — still the ordinary, benign case.
+- **Merged, but recoverable.** `head` is already an ancestor of `base`, and because a
+  real merge commit exists on the path between them, the base as it stood *before* that
+  merge landed can be recovered exactly. A bundle **is** written — just from that
+  recovered base rather than the one requested, which the run calls out so the swap is
+  never silent. `--json`'s `requested_base` field carries what you actually asked for.
+- **Merged, unrecoverable.** `head` is an ancestor of `base`, but no merge commit exists
+  to recover an earlier point from — typically a fast-forward merge. Nothing is swept,
+  because the branch really is merged and there's no earlier base left to derive. The
+  fix is to re-run with an explicit `--base <pre-merge-sha>`.
+- **Detection failed.** The merged/not-merged check itself couldn't be answered, so the
+  run doesn't guess — it degrades to treating the branch as unmerged (the first outcome
+  above) and says so.
 
 The diff is capped at `[sweep].max_diff_bytes` (default 256 KB, roughly 65k tokens) —
 past that, a sweep agent skims rather than reads, so the bundle is truncated instead.

@@ -129,7 +129,7 @@ mined_from:
 | Symptom | Look here |
 |---|---|
 | Bundle/land flags, `[sweep]` config keys | [commands/sweep.md](../commands/sweep.md) |
-| Wrap-session's own pattern sweep (Phase 4b) | [rituals/wrap-session.md](../rituals/wrap-session.md) |
+| Wrap-session's own pattern-sweep phase | [rituals/wrap-session.md](../rituals/wrap-session.md) |
 | Landed but not surfacing in review | [walkthroughs/first-mining-run.md](first-mining-run.md) |
 | Something else looks broken | [troubleshooting.md](../troubleshooting.md) |
 

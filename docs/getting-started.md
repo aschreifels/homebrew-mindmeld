@@ -34,10 +34,11 @@ The installed engine (a Homebrew keg's `libexec`) is the source of truth:
 skills install as symlinks back into it, not copies, so there's no separate
 updater to install. To upgrade: `brew upgrade mindmeld` bumps the engine,
 then `mindmeld update` reinstalls the adapter, re-stamps this guide into
-your KB, and syncs the seed-tracked boards — skills are symlinks into the
-install, so `update` is what brings the guide and boards current, not the
-brew step alone. If you're working from a source checkout instead, `init`
-wires it up the same way, just without the tap.
+your KB, and syncs the seed-tracked boards and templates — skills are
+symlinks into the install, so `update` is what brings the guide, boards,
+and templates current, not the brew step alone. If you're working from a
+source checkout instead, `init` wires it up the same way, just without the
+tap.
 
 ## What `init` just did
 

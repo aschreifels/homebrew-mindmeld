@@ -29,6 +29,17 @@ regardless of what it hits along the way: it never rebases, never widens the git
 beyond what it needs, a refusal mutates nothing, a conflict leaves the tree exactly as
 found, push retries at most once, the run is idempotent, and `--dry-run` writes nothing.
 
+A dirty KB tree no longer refuses the run outright. Preflight fetches the remote,
+diffs what the incoming merge would actually bring in, and checks that against what's
+dirty — it refuses only on the overlap, naming the colliding paths. Dirt the merge
+wouldn't touch is left alone and the run proceeds, with a line saying it ran over a
+dirty tree so that's never mistaken for a clean one. This matters because concurrent
+sessions against one shared KB are the normal case in this paradigm, not an edge case
+to guard against — a peer's in-flight files no longer cost you a sync unless they
+genuinely collide with what's incoming. If the fetch itself fails, sync has no way to
+know what the merge would touch, so it falls back to the old, blanket refusal rather
+than treat an unverifiable tree as safe.
+
 ## Output
 
 Report lines are tagged `sync`. A disabled run prints

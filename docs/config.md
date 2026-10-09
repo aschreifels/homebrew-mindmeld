@@ -59,6 +59,17 @@ Per-*repo* policy is deliberately not the instance ring's job — a repo's own
 `AGENTS.md` already carries it, and a person-owned overlay's `applies_when:`
 frontmatter is how it targets a repo. There's no third ring for repos.
 
+**Worked example: the code-docs policy.** `placement` and `verbosity` — where an
+agent's reasoning goes and how much of it gets written — answer "how should code get
+documented," which is true on every machine a person works from, so they live at
+`{kb.root}/policy/code-docs.md`, not a `[docs]` table in `mindmeld.toml`. The gate that
+*enforces* something else entirely — `roots`, `max_comment_lines`, `enforce` — stayed
+in the repo, at `docs/internals/_index.md`'s frontmatter, because a contributor who
+clones mindmeld with no KB still has to be able to run `make lint`. Neither half added
+a `mindmeld.toml` key. And `{kb.root}/policy/` isn't a second bridge into the KB — it's
+derived from `[kb] root` the same way `wiki/_hot.md` and `skills/` already are, so
+corollary 1 holds without an exception.
+
 ## `[kb]`
 
 The knowledge base itself — the one thing every other table exists to serve.
@@ -105,11 +116,27 @@ Shared conventions for session-opening tooling (spawn-session and friends).
 | `base_branch` | string | optional | `"main"` | spawn-session (branch point), wrap-session (merge-back check) |
 | `worktree_dir` | path | optional | none | spawn-session, when creating a new worktree |
 | `dossier_dir` | path | optional | none | spawn-session, when creating a session's plan dossier |
+| `dossier_archive_dir` | path | optional | `<dossier_dir>-archive`, a sibling of the resolved dossier root | `ritual.archive` (the mcp plane), as the root a wrapped dossier is moved to |
 | `projects_dir` | path | optional | none | spawn-session, to target the durable main checkout (e.g. editor-open links in dossier docs) |
 
-The three `_dir` keys have no engine-level fallback — when omitted, the skill
-that needs one applies its own built-in convention rather than assuming a
-path.
+`worktree_dir`, `dossier_dir`, and `projects_dir` have no engine-level fallback
+— when omitted, the skill that needs one applies its own built-in convention
+rather than assuming a path. `dossier_archive_dir` is the one exception: since
+archival moved from a skill's shell recipe into the `ritual.archive` plane verb
+(`internal/mcp`), the engine itself now applies the fallback — a sibling of
+`dossier_dir`'s RESOLVED root directory (`~/dossiers-archive` alongside
+`~/dossiers`), never of the configured spelling — rather than leaving it to
+prose. A `dossier_dir` that is itself a symlink alias gets its default archive
+sibling next to where runs actually live, not next to the alias. The sibling
+relationship is deliberate, not incidental: a
+wrapped dossier has to land somewhere the engine's journal discovery —
+confined to `dossier_dir` alone — structurally cannot see, so a subdirectory of
+`dossier_dir` was never an option, and `ritual.archive` refuses outright
+(`archive_root_overlap`) rather than accept a configured or defaulted archive
+root that overlaps `dossier_dir` in either direction. See
+`docs/internals/ritual.md` for why that separation is what makes archival
+release a run's (project, branch) coordinate for reuse, and
+`docs/commands/mcp.md`'s `ritual.archive` entry for the verb itself.
 
 ## `[project_management]`
 
@@ -117,12 +144,13 @@ Which ticket backend a session's spawn/wrap ritual talks to.
 
 | key | type | required | default | who reads it |
 | --- | --- | --- | --- | --- |
-| `provider` | enum: `kb` \| `linear` \| `notion` \| `jira` \| `none` | optional | `"kb"` | spawn-session and wrap-session, to pick the ticket backend; the `kb` default needs no MCP connector |
+| `provider` | enum: `kb` \| `linear` \| `notion` \| `jira` \| `none` | optional | `"kb"` | spawn-session and wrap-session, to pick the ticket backend; the `kb` default needs no external tracker connector, but does need mindmeld's own MCP plane — see [`[install] mcp`](#install) |
 | `default_project` | string | optional | `""` | spawn-session's `--draft` flow, only when `provider` is an MCP provider (`linear`/`notion`/`jira`) |
 
 Every key in this table is optional — an omitted `[project_management]`
 table means `provider` defaults to `"kb"`, the zero-config, batteries-included
-path: KB-native tickets, no MCP connector required.
+path: KB-native tickets, no external tracker connector required — mindmeld's
+own MCP plane still has to be reachable, per `[install] mcp` above.
 
 ### `[project_management.prompts]`
 
@@ -163,6 +191,7 @@ override its auto-detection.
 | `adapter` | string | optional | `"claude-code"` | `bin/mindmeld init`/`doctor`, auto-detected from `~/.claude` when omitted |
 | `skills_dir` | path | optional | `""` | the adapter, to override where it installs skill symlinks |
 | `hooks` | enum: `auto` \| `print` \| `off` | optional | `"auto"` | the adapter's hook-wiring step — `auto` merges and backs up, `print` only shows the snippet, `off` skips it |
+| `mcp` | enum: `auto` \| `print` \| `off` | optional | `"auto"` | the adapter's mcp-registration step — `auto` registers the mindmeld control plane with the harness (asking first when a human is present), `print` emits the command to run by hand instead of writing anything, `off` skips registration entirely |
 
 Every key in this table is optional too — omitting `[install]` entirely just
 means the adapter auto-detects everything.
@@ -192,7 +221,6 @@ turns a session into candidate drafts.
 | `recurrence.patterns_collection` | string | optional | `""` | the qmd similarity adapter, the qmd collection to search for sightings of an already-PROMOTED pattern — `""` resolves to `{kb-basename}-patterns`. Without this second collection a promoted pattern is searchable but never searched: its recurrence count would restart at 1 the moment it left `candidates/`. `init` registers it alongside the candidates one, honoring an override the same way |
 | `recurrence.refresh` | bool | optional | `true` | the qmd similarity adapter, whether to reindex once per invocation before that invocation's first search (`mine run`, `mine land`, and `sweep land` alike) — note `qmd update` is global, so this touches every registered collection, not only the candidates one |
 | `recurrence.timeout` | duration string | optional | `"60s"` | the qmd similarity adapter, the ceiling for one `qmd query` — the wait for the shared lock included, capped at a quarter of the budget so a contended wait still leaves time to run the query, parsed with `time.ParseDuration` |
-| `recurrence.reindex_timeout` | duration string | optional | `"10m"` | the qmd similarity adapter, the ceiling for the whole reindex (`qmd update` plus one `qmd embed` per collection), exclusive-lock wait included on the same quarter-budget rule. Separate from `timeout` because an embed runs a local model over every new document — minutes on a first pass — where a query is seconds; one number for both meant a reindex could be killed by a ceiling chosen for a query |
 
 `min_idle` exists because a session store has no "session closed" record. A
 session's `ended` is only the timestamp of its last message at read time, so
@@ -205,11 +233,13 @@ What makes a wrong guess recoverable is that a verdict settles only the
 material it was rendered on. Every terminal ledger row records the session's
 extent at capture time (`captured`), and selection re-opens a session whose
 source has since grown past it. Reclamation refuses material newer than its
-own authorizing verdict for the same reason, though it measures a different
-mark — `mine prune` compares spooled file mtimes against when the verdict was
-written, not against the extent it read. A row written before this record
-existed carries no extent; absence reads as no evidence, so those sessions
-stay settled and `mine run --force` is how you re-open one by hand.
+own authorizing verdict for the same reason, and against the same mark: a
+terminal row records the source file's mtime alongside the turn count and the
+last-message timestamp, and the capture sweep stamps that same source mtime
+onto every spooled file it writes. So `mine prune` compares mtime to mtime —
+one clock on both sides, no skew and no tolerance. A row written before this
+record existed carries no extent; absence reads as no evidence, so those
+sessions stay settled and `mine run --force` is how you re-open one by hand.
 
 Re-opening re-mines the **whole** session, not just the tail, so the extractor
 re-produces findings that already landed. Recurrence is what absorbs that: a
@@ -299,16 +329,42 @@ A reindex that cannot take the lock, or that fails once it has, is skipped
 rather than forced, and reports a `[mine]` warn line instead of degrading
 silently.
 
-The claim is scoped to **mindmeld-issued** qmd invocations, and that scope
-is worth stating because mindmeld ships others that fall outside it. The
-session-start pulse hook (`hooks/kb-pulse.sh`) reindexes after a merge; the
-landing pass in `mine-review`, `wrap-session`, `voice-distill`, and
-`kb-ticket` tells the agent to run `qmd update` from its own shell; `init`
-shells `qmd embed`. None of those go through the lock, so a session opening
-in the middle of a mining fan-out can still collide. Closing that gap means
-routing every reindex through the binary, which is a larger change than
-this seam — until then, a `SQLITE_BUSY` during a fan-out is not evidence
-the lock is broken.
+The claim used to be scoped to **mindmeld-issued** qmd invocations, because
+mindmeld shipped others that fell outside the lock: the session-start pulse
+hook ran a bare `qmd update`, the landing pass in `mine-review`,
+`wrap-session`, `voice-distill`, and `kb-ticket` told the agent to run
+`qmd update` from its own shell, and `init` shelled `qmd embed` directly.
+All of those now go through the lock, by two different routes: the hook
+calls `mindmeld reindex --no-wait --no-embed` and the four rituals' landing
+passes name the same verb, while `init` and the MCP ticket landing pass
+take the lock themselves around the work they already did — every one of
+those a writer, taking the exclusive side around work that changes the
+index. `recall` is routed too, on the other side: it takes the shared side
+briefly around each `qmd query` and proceeds unlocked — marking its answer
+degraded — rather than waiting out a held exclusive lock. What's left
+outside it is exactly three things:
+
+1. `doctor`'s `qmd collection show` calls — a deliberate choice, not an
+   oversight. `doctor` is a read-only diagnostic pass and must never hang
+   behind the lock held by the thing it is diagnosing, so it distinguishes
+   a busy index from a missing collection instead of gating on the lock.
+2. A person typing `qmd` by hand.
+3. An agent that ignores its skill's landing pass.
+
+Any of the three can still collide with a reindex in flight — a
+`SQLITE_BUSY` from one of them is not evidence the lock is broken.
+
+## `[reindex]`
+
+Config for `mindmeld reindex` (`internal/reindex`) — the locked "qmd
+update, then qmd embed" sequence, exposed as a verb so every reindexing
+caller can run through one implementation instead of keeping its own copy.
+What actually routes through it today is stated in the `[mining]` section's
+lock note above; this section documents the verb's own knobs.
+
+| key | type | required | default | who reads it |
+| --- | --- | --- | --- | --- |
+| `timeout` | duration string | optional | `"10m"` | `mindmeld reindex`, the ceiling for the whole reindex — the wait for the index's own serialization and the work it protects (`qmd update` plus every `qmd embed`) share this one budget — an empty or unparseable value falls back to the default rather than refusing to run; `--no-wait` replaces waiting for the lock with a single non-blocking attempt instead |
 
 ## `[sync]`
 
@@ -404,6 +460,61 @@ Being a declared candidate rather than a probed one, a value here that fails
 the marker test is a loud, run-global error naming the key — never a silent
 fall-through to guessing.
 
+## `[execution]`
+
+The machine-local half of chunk routing: what this box can actually fill a
+request with. The portable half — what caliber of worker a kind of chunk
+deserves — is a person's policy, true on every machine they work from, so it
+lives in the KB instead and is served resolved (defaults applied) at
+`mindmeld://policy/chunk-routing`, the same treatment
+`mindmeld://policy/code-docs` already gets. This table answers a different
+question: "what can this box fill a request with," which is a fact about the
+machine, not a preference that has to hold everywhere.
+
+| key | type | required | default | who reads it |
+| --- | --- | --- | --- | --- |
+| `record_executor` | bool | optional | `true` | the chunk-execution organ, whether it records the concrete executor id on every attempt — the semantic class and outcome are retained either way, so this key governs only the opaque vendor id |
+| `classes.mechanical` | string | optional | `""` | the chunk-execution organ, this machine's executor for `mechanical`-class work |
+| `classes.balanced` | string | optional | `""` | the chunk-execution organ, this machine's executor for `balanced`-class work |
+| `classes.deep` | string | optional | `""` | the chunk-execution organ, this machine's executor for `deep`-class work |
+
+Every `[execution.classes]` value is OPAQUE to the engine — an
+adapter-addressed string stored and passed along, never parsed. An empty
+value means this box has no executor for that class; a class with no mapping
+still runs, delegated, at its advertised class on the host's default
+executor, recording a blank executor id — rather than silently sharing a
+mapped executor with another class. What to actually put in these three
+values is your installed adapter's own answer — see its
+`adapters/<adapter>/notes.md` for a worked mapping against that harness's
+real roster.
+
+Not read from this table, but resolved alongside it whenever `doctor` diagnoses a
+host: the adapter's own declared capabilities, stamped into your KB at
+`{kb.root}/adapters/<adapter>/manifest.json` the same marker-guarded way notes.md is
+(`internal/initrun`, the adapter-notes step). `chunk.declare`'s driver reads that
+file's contents directly as the manifest to declare; `mindmeld doctor` reads it too, to
+report — before a session ever declares a chunk graph — which of the resolved KB
+routing policy's class targets and floors (`mindmeld://policy/chunk-routing`, this
+section's own sibling table) the manifest's own `classes` list actually offers. See
+[mindmeld doctor](commands/doctor.md#adapter-manifest-and-host-diagnostics) for the
+full set of lines this produces.
+
+## `[mcp]`
+
+`mindmeld mcp`'s config table — reserved for v1. The tool surface (nine
+ritual verbs, `ticket.*`, `recall.*`) and the ritual kinds/versions it
+negotiates are fixed by `internal/mcp.Surface()` and the embedded ritual
+definitions, not by config; there is nothing this table needs to say to run
+the server today.
+
+| key | type | required | default | who reads it |
+| --- | --- | --- | --- | --- |
+| `rituals_enabled` | array of strings | optional | unset — every embedded ritual kind is enabled | reserved; not read yet. A candidate key for the day ritual definitions externalize (MIN-3), so a KB can narrow which kinds `ritual.start` accepts |
+
+An omitted `[mcp]` table is the common case and changes nothing: `mindmeld
+mcp` always serves the full tool surface `Surface()` reports, regardless of
+whether this table is present.
+
 ## The KB instance
 
 `mindmeld init` stamps a minimal viable KB at `{kb.root}` — the directory
@@ -412,14 +523,20 @@ pulse hook, qmd, Bases) can assume without checking:
 
 ```
 {kb.root}/
-  CLAUDE.md            # from kb-scaffold/CLAUDE.md, with the owner-context slot filled
+  AGENTS.md            # from kb-scaffold/AGENTS.md — short orientation plus two includes,
+                       # copy-if-absent, never re-clobbered
+  OWNER.md             # from kb-scaffold/OWNER.md, with the owner-context slot filled —
+                       # copy-if-absent, never re-clobbered
+  docs/mindmeld/kb-schema.md   # the paradigm schema — engine-owned, re-stamped by
+                               # `mindmeld update`, not scaffolded by kb-scaffold
   .gitignore           # from kb-scaffold/gitignore (output/, conflict artifacts)
   raw/  wiki/  projects/  research/  solutions/  tools/  decisions/
   patterns/  ideas/  people/{owner}/  sessions/  tickets/  output/
   candidates/          # the review queue — empty until mining lands a draft,
                        # scaffolded anyway because init registers it as a qmd collection
   wiki/_hot.md         # derived-local: gitignored, regenerated, never committed
-  templates/           # copied from the engine's templates/ — user-editable from then on
+  templates/           # seed-tracked against the engine's templates/ — see
+                       # docs/commands/update.md's "Sync templates" step
     ticket.md  pattern.md  decision.md
     dossier/{MANIFEST,plan,adr,contract,chunk-brief,chunk-report,spec-brief,wrap}.md
   skills/              # the instance ring — see below
@@ -444,21 +561,30 @@ Every skill that resolves an overridable asset checks two places, in order:
 Both sets load; the instance ring wins on conflict. A miss at step 1 is not
 an error — an empty or absent instance ring is the adopter's normal state,
 not a gap to fix. `init` scaffolds `{kb}/skills/` and stamps a `README.md`
-into it, copy-if-absent, the same posture as `templates/`; it never creates
-per-skill subdirectories — those appear only when the owner (or a synced KB)
-adds one. `doctor` reports the ring's presence and an override count as an
-informational check, never a failure (see "What init touches" below).
+into it, copy-if-absent (unlike `templates/`, which is seed-tracked instead —
+see above); it never creates per-skill subdirectories — those appear only
+when the owner (or a synced KB) adds one. `doctor` reports the ring's
+presence and an override count as an informational check, never a failure
+(see "What init touches" below).
 
 ### The pulse cache (`wiki/_hot.md`)
 
-`mindmeld hot` regenerates this file — open work and recent activity, rendered as a
-compact block. The SessionStart hook (`hooks/kb-pulse.sh`) reads it verbatim into every
-new session and then triggers a background refresh, so the file a session sees trails
-reality by one session at most. `init` offers to seed it right after scaffolding the KB, so
-a fresh install has a pulse before the first session rather than after it; declining the
-offer just means the first session's hook run generates it instead. Being derived-local,
-it's absent on a fresh clone of an existing KB until something regenerates it — that
-absence is expected, not an error.
+`mindmeld hot` regenerates this file — open work, recent activity, and the code-docs
+policy directive, rendered as a compact block. The
+SessionStart hook (`hooks/kb-pulse.sh`) reads it verbatim into every new session and
+then triggers a background refresh, so the file a session sees trails reality by one
+session at most. `init` offers to seed it right after scaffolding the KB, so a fresh
+install has a pulse before the first session rather than after it; declining the offer
+just means the first session's hook run generates it instead. Being derived-local, it's
+absent on a fresh clone of an existing KB until something regenerates it — that absence
+is expected, not an error.
+
+The policy section renders `placement` and `verbosity` resolved from
+`{kb.root}/policy/code-docs.md`, but only when that resolves to something other than
+the harness's own default (`inline` placement, `verbose` prose) — a harness-native
+policy would just be asking the agent for what it was already going to do, so it stays
+silent instead. Every render of the section names its own source file, so a reader who
+wants to change the policy always knows exactly which file to edit.
 
 After the files land, `init` runs `git init` plus an initial commit, then
 `qmd collection add` and `qmd embed` — but only when `qmd` is present on the
@@ -466,16 +592,25 @@ machine; its absence degrades to "note printed, everything else lands."
 
 A few things hold regardless of instance:
 
-- **`kb-scaffold/CLAUDE.md` carries the full frontmatter schema unchanged** —
-  the seven entity types, their required fields, and ticket type-specifics
-  are the paradigm contract every KB shares. Only the Owner Context section
-  is a per-instance slot. Status enums (`backlog | active | in-review | done
-  | dropped`, etc.) never vary per instance either.
+- **The paradigm schema is a guide page, not a stamped copy.** The seven
+  entity types, their required fields, ticket type-specifics, and status
+  enums (`backlog | active | in-review | done | dropped`, etc.) live at
+  `{kb.root}/docs/mindmeld/kb-schema.md` — engine-owned, marker-guarded, and
+  re-stamped by `mindmeld update` on every upgrade. Splitting it out of
+  `AGENTS.md` this way is why it stops going stale: a stamped copy of the
+  paradigm contract starts drifting from the moment it lands, because
+  nothing ever re-stamps a file the instance owns. `AGENTS.md` itself
+  carries no schema content at all — it's a short orientation paragraph plus
+  two includes, `@OWNER.md` and `@docs/mindmeld/kb-schema.md`, both resolved
+  relative to `{kb.root}`.
 - **Bases are copied as-is.** They filter on schema fields only, never on any
   particular owner's values, so they work identically across instances.
-- **Templates ride the content ring after init.** Once `{kb}/templates/` is
-  stamped, engine updates never overwrite it — drift from the shipped
-  defaults is the owner's right.
+- **Templates are seed-tracked, the same as bases.** A template you never touch
+  stays current across `mindmeld update`; one you edit is never overwritten in
+  place — only replaced or merged once the seed proves your copy hasn't
+  diverged from what was last stamped. See
+  [Your KB, directory by directory](kb-layout.md#the-seed-how-ownership-is-tracked-and-handed-off)
+  for the full mechanism and how to hand a file's ownership over entirely.
 - **Scaffolding is additive-idempotent.** Existing directories and files are
   left untouched; only what's missing gets filled in. Re-running `init`
   against an already-scaffolded KB is a no-op walk.
@@ -491,9 +626,35 @@ This is the complete set of host paths `mindmeld init` may write under the
                                        # symlinks → the repo (falls back to --copy if needed)
 ~/.claude/hooks/kb-pulse.sh            # symlink → the repo
 ~/.claude/settings.json                # SessionStart hook entry, merged in
+~/.claude.json                         # mcpServers.mindmeld entry, merged in — see below
 ~/.claude/mindmeld-backups/<surface>/  # anything init displaced lands here — see below
 {kb.root}/**                           # per "The KB instance" above
+{kb.root}/CLAUDE.md                    # written by the adapter, not kb-scaffold — see below
 ```
+
+`~/.claude.json` is a different kind of write than everything else on this list, and it's
+worth being precise about the posture: this is the harness's own runtime state file —
+oauth account, machine id, caches, per-project history — and mindmeld does not own it the
+way it owns `settings.json`. `init` (and `update`) merge exactly one key into it,
+`mcpServers.mindmeld`, and preserve every other key verbatim, including number literals
+that would lose precision under a naive JSON round-trip (`json.Decoder.UseNumber()`, not a
+`map[string]any` decode). A write always backs up the file first, and that backup carries
+the *source file's own mode* rather than the `0644` this package otherwise defaults to —
+`~/.claude.json` is `0600` because it holds an oauth account, and a backup that widens
+permissions on a credentialed file would be a security regression wearing a safety
+costume. And unlike every other surface here, mindmeld refuses outright rather than
+writing when the file won't parse: a `~/.claude.json` it cannot decode is one it would
+destroy by rewriting.
+
+`{kb.root}/CLAUDE.md` is the one KB-root file the adapter writes rather than
+kb-scaffold: this harness hard-codes that filename and can't be pointed at
+`AGENTS.md` directly, so the adapter generates a two-line shim whose body is
+`@AGENTS.md`. It's written only when `{kb.root}/AGENTS.md` already exists —
+a shim pointing at nothing would classify as a legacy KB, and repairing that
+would wrongly promote a generated pointer into the KB's own schema. An
+existing `CLAUDE.md` is never overwritten, generated or hand-authored alike;
+`mindmeld doctor` reports whether the shim is present, missing, or diverged
+from what it would generate (see [Troubleshooting](troubleshooting.md)).
 
 The `settings.json` merge is a small, specific operation:
 
@@ -509,8 +670,8 @@ The `settings.json` merge is a small, specific operation:
 A collision — something already sitting at a path `init` needs — is never
 overwritten in place. It's moved to
 `~/.claude/mindmeld-backups/<surface>/<name>.pre-mindmeld-<YYYYMMDD-HHMMSS>`,
-`<surface>` one of `skills`, `hooks`, `settings`, and *that* root is never a
-sibling of the thing it displaced.
+`<surface>` one of `skills`, `hooks`, `settings`, `mcp`, and *that* root is never
+a sibling of the thing it displaced.
 
 The reason is `~/.claude/skills/` specifically: it's a discovery root — the
 harness treats anything sitting in it as an installed skill. An in-place
@@ -540,7 +701,7 @@ Invariants that hold across the whole surface:
   `~/.claude/mindmeld-backups/<surface>/`, never deleted.
 - Every write is preceded by an existence check, so re-running `init` is a
   no-op walk when nothing's missing.
-- No `sudo`, and no writes outside the five host paths above plus
+- No `sudo`, and no writes outside the six host paths above plus
   `{kb.root}`.
 - **`doctor` is read-only against this same surface.** It reports on drift or
   missing pieces; it never repairs anything itself — repair means re-running
